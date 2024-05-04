@@ -1,12 +1,9 @@
 """Match OSM and Wikidata items."""
 
-
 CallParams = dict[str, str | int]
 
 user_agent = (
-    "osm-wikidata/0.2"
-    + " (https://github.com/EdwardBetts/osm-wikidata;"
-    + " edward@4angle.com)"
+    "osm-wikidata/0.2 (https://git.4angle.com/edward/owl-map; edward@4angle.com)"
 )
 
 
