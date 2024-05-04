@@ -6,7 +6,7 @@ from collections import OrderedDict
 
 import requests
 
-from . import CallParams
+from . import CallParams, user_agent_headers
 
 Hit = dict[str, typing.Any]
 
@@ -28,7 +28,7 @@ def lookup_with_params(**kwargs: str) -> list[Hit]:
         "polygon_text": 0,
     }
     params.update(kwargs)
-    r = requests.get(url, params=params)
+    r = requests.get(url, params=params, headers=user_agent_headers())
     if r.status_code == 500:
         raise SearchError
 
