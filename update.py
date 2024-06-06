@@ -6,6 +6,8 @@ import json
 import typing
 from time import sleep
 
+import requests.exceptions
+
 from matcher import model, wikidata, wikidata_api
 from matcher.database import init_db, session
 
@@ -81,7 +83,14 @@ def handle_edit(change: Change) -> None:
         print(f"{ts}: no need to update {qid}")
         return
 
-    entity = wikidata_api.get_entity(qid)
+    for attempt in range(100):
+        try:
+            entity = wikidata_api.get_entity(qid)
+        except requests.exceptions.ConnectionError:
+            print("connection error, retrying.")
+            sleep(10)
+        else:
+            break
     entity_qid = entity.pop("id")
     if entity_qid != qid:
         print(f"{ts}: item {qid} replaced with redirect")
@@ -123,6 +132,15 @@ def update_database() -> None:
         r = wikidata_api.get_recent_changes(rcstart=start, rccontinue=rccontinue)
 
         reply = r.json()
+        if (
+            "error" in reply
+            and reply["error"]["code"] == "internal_api_error_DBQueryTimeoutError"
+        ):
+            print(reply)
+            sleep(10)
+            continue
+        if "query" not in reply:
+            print(reply)
         for change in reply["query"]["recentchanges"]:
             rctype = change["type"]
             timestamp = change["timestamp"]
