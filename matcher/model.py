@@ -107,7 +107,7 @@ class Item(Base):
     aliases = Column(postgresql.JSONB)
     sitelinks = Column(postgresql.JSONB)
     claims = Column(postgresql.JSONB, nullable=False)
-    lastrevid = Column(Integer, nullable=False, unique=True)
+    lastrevid = Column(BigInteger, nullable=False, unique=True)
     locations: Mapped[list["ItemLocation"]] = relationship(
         "ItemLocation", cascade="all, delete-orphan", backref="item"
     )
