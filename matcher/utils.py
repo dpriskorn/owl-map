@@ -204,7 +204,7 @@ def format_wikibase_time(v: WikibaseTime) -> str | None:
         case 7:  # century
             century = ((int(t[:5]) - 1) // 100) + 1
             ordinal_num = num2words(abs(century), to="ordinal_num")
-            return f"{ordinal_num} {century}{' BC' if century < 0 else ''}"
+            return f"{ordinal_num} century{' BC' if century < 0 else ''}"
         case 6:  # millennium
             millennium = ((int(t[:5]) - 1) // 1000) + 1
             ordinal_num = num2words(abs(millennium), to="ordinal_num")
