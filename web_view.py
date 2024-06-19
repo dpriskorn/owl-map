@@ -555,7 +555,8 @@ def api_get_item_tags(item_id):
     )
 
 
-def expand_street_name(from_names):
+def expand_street_name(from_names: typing.Collection[str]) -> set[str]:
+    """Expand street name."""
     ret = set(from_names)
     for name in from_names:
         if any(name.startswith(st) for st in ("St ", "St. ")):
@@ -563,12 +564,10 @@ def expand_street_name(from_names):
             ret.add("Saint" + name[first_space:])
 
         if ", " in name:
-            for n in set(ret):
-                comma = n.find(", ")
-                ret.add(name[:comma])
+            comma = name.find(", ")
+            ret.add(name[:comma])
         elif "/" in name:
-            for n in set(ret):
-                ret.extend(part.strip() for part in n.split("/"))
+            ret.update(part.strip() for part in name.split("/"))
 
     ret.update({"The " + name for name in ret if not name.startswith("The ")})
     return ret
