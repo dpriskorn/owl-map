@@ -951,6 +951,9 @@ def get_item_street_addresses(item: model.Item) -> list[str]:
         qualifiers = claim.get("qualifiers")
         if not qualifiers or "P670" not in qualifiers:
             continue
+        if "datavalue" not in qualifiers["P670"]:
+            print(f"datavalue missing in P670 for {item.qid}")
+            continue
         number = qualifiers["P670"][0]["datavalue"]["value"]
 
         street_item = get_item(claim["mainsnak"]["datavalue"]["value"]["numeric-id"])
