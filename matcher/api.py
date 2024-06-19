@@ -941,7 +941,11 @@ def get_item(item_id: int) -> model.Item | None:
 
 def get_item_street_addresses(item: model.Item) -> list[str]:
     """Hunt for street addresses for the given item."""
-    street_address = [addr["text"] for addr in item.get_claim("P6375") if addr]
+    p6375 = item.get_claim("P6375")
+    assert isinstance(p6375, list)
+    street_address: list[str] = [
+        typing.cast(str, addr["text"]) for addr in p6375 if addr
+    ]
     if street_address or "P669" not in item.claims:
         return street_address
 
@@ -951,8 +955,8 @@ def get_item_street_addresses(item: model.Item) -> list[str]:
         qualifiers = claim.get("qualifiers")
         if not qualifiers or "P670" not in qualifiers:
             continue
-        if "datavalue" not in qualifiers["P670"][0]:
-            print(f"datavalue missing in P670 for {item.qid}")
+        if "datavalue" not in qualifiers["P670"][0]:  # 'no value' for P670
+            assert qualifiers["P670"][0]["snaktype"] == "novalue"
             continue
         number = qualifiers["P670"][0]["datavalue"]["value"]
 
