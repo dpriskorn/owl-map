@@ -676,7 +676,7 @@ def api_polygon(osm_type, osm_id):
 @app.route("/refresh/Q<int:item_id>")
 def refresh_item(item_id: int) -> str:
     """Refresh the local mirror of a Wikidata item."""
-    existing = model.Item.query.get(item_id)
+    item = model.Item.query.get(item_id)
 
     qid = f"Q{item_id}"
     entity = wikidata_api.get_entity(qid)
@@ -686,9 +686,9 @@ def refresh_item(item_id: int) -> str:
     coords = wikidata.get_entity_coords(entity["claims"])
 
     obj = {k: v for k, v in entity.items() if k in entity_keys}
-    if existing:
+    if item:
         for k, v in obj.items():
-            setattr(model, k, v)
+            setattr(item, k, v)
     else:
         item = model.Item(item_id=item_id, **obj)
         database.session.add(item)
