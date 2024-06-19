@@ -244,9 +244,12 @@ def identifier_index():
 
 @app.route("/commons/<filename>")
 def get_commons_image(filename):
+    if filename == "null":
+        flask.abort(404)
     detail = commons.image_detail([filename], thumbheight=1200, thumbwidth=1200)
-    image = detail[filename]
-    return flask.redirect(image["thumburl"])
+    if filename not in detail:
+        flask.abort(404)
+    return flask.redirect(detail[filename]["thumburl"])
 
 
 @app.route("/identifier/<pid>")
