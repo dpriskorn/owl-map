@@ -653,7 +653,10 @@ def api_missing_wikidata_items():
 @app.route("/api/1/search")
 def api_search():
     q = flask.request.args["q"]
-    hits = nominatim.lookup(q)
+    try:
+        hits = nominatim.lookup(q)
+    except nominatim.SearchError as e:
+        return cors_jsonify({"success": False, "error": str(e)}, 503)
     for hit in hits:
         hit["name"] = nominatim.get_hit_name(hit)
         hit["label"] = nominatim.get_hit_label(hit)

@@ -31,6 +31,8 @@ def lookup_with_params(**kwargs: str) -> list[Hit]:
     r = requests.get(url, params=params, headers=user_agent_headers())
     if r.status_code == 500:
         raise SearchError
+    if r.status_code == 403:
+        raise SearchError("Nominatim returned 403 Forbidden")
 
     try:
         reply: list[Hit] = json.loads(r.text, object_pairs_hook=OrderedDict)
