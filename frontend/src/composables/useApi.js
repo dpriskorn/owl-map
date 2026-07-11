@@ -115,8 +115,8 @@ export function useApi() {
             ).catch(() => ({data: null})),
           ]);
           results[qid] = {
-            label: labelRes.data?.label || qid,
-            description: descRes.data?.description || null,
+            label: labelRes.data || qid,
+            description: descRes.data || null,
           };
         } catch {
           results[qid] = {label: qid, description: null};
