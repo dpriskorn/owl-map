@@ -1,0 +1,33 @@
+[project]
+name = "owl-map"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "Nizo",email = "nizo@example.com"}
+]
+requires-python = "^3.11"
+dependencies = [
+    "flask (>=3.1.3,<4.0.0)",
+    "geoip2 (>=5.2.0,<6.0.0)",
+    "lxml (>=6.1.1,<7.0.0)",
+    "maxminddb (>=3.1.1,<4.0.0)",
+    "requests (>=2.34.2,<3.0.0)",
+    "sqlalchemy (>=2.0.51,<3.0.0)",
+    "requests-oauthlib (>=2.0.0,<3.0.0)",
+    "geoalchemy2 (>=0.20.0,<0.21.0)",
+    "simplejson (>=4.1.1,<5.0.0)",
+    "user-agents (>=2.2.0,<3.0.0)",
+    "num2words (>=0.5.14,<0.6.0)",
+    "psycopg2-binary (>=2.9.12,<3.0.0)",
+    "flask-login @ git+https://github.com/maxcountryman/flask-login.git"
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[dependency-groups]
+dev = [
+    "pytest (>=9.1.1,<10.0.0)"
+]

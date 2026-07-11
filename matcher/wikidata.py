@@ -36,6 +36,8 @@ def read_hq_coords(claims: Claims) -> list[Coords]:
     """Coordinates of item headquarters."""
     found: list[Coords] = []
     for hq_claim in claims.get(hq_pid, []):
+        if hq_claim.get("rank") == "deprecated":
+            continue
         for snak in hq_claim.get("qualifiers", {}).get(coords_pid, []):
             if coords := read_coords(snak):
                 found.append(coords)
@@ -45,7 +47,13 @@ def read_hq_coords(claims: Claims) -> list[Coords]:
 
 def read_location_statement(claims: Claims, pid: str) -> list[Coords]:
     """Get coordinates from given claim."""
-    return [i for i in (read_coords(c["mainsnak"]) for c in claims.get(pid, [])) if i]
+    return [
+        i
+        for c in claims.get(pid, [])
+        if c.get("rank") != "deprecated"
+        for i in [read_coords(c["mainsnak"])]
+        if i
+    ]
 
 
 def get_entity_coords(claims: Claims) -> dict[str, Any]:
