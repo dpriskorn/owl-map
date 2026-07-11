@@ -292,6 +292,7 @@ const closeEditList = () => {
 // Filter handlers
 const handleToggleIsa = (qid) => {
   toggleIsa(qid);
+  state.item_type_search = '';
 };
 
 // Lifecycle
