@@ -13,14 +13,15 @@
       <a
         v-for="hit in displayHits"
         :key="hit.qid || hit.id"
-        class="list-group-item d-flex justify-content-between align-items-center"
+        class="list-group-item d-flex flex-column"
         href="#"
         @click.prevent="$emit('toggle-isa', hit.qid || hit.id)"
       >
         <span :class="isTicked(hit.qid || hit.id) ? 'fw-bold' : ''">
           {{ hit.label || hit.qid || hit.id }}
         </span>
-        <span v-if="hit.count" class="badge bg-secondary">{{ hit.count?.toLocaleString() }}</span>
+        <small v-if="hit.description" class="text-muted">{{ hit.description }}</small>
+        <span v-if="hit.count" class="badge bg-secondary mt-1">{{ hit.count?.toLocaleString() }}</span>
       </a>
     </div>
 
