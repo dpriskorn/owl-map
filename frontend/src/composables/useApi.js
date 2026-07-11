@@ -97,16 +97,24 @@ export function useApi() {
     return results;
   };
 
+  let wikidataSearchAbort = null;
+
   const searchWikidata = async (query, language = null) => {
     if (!query || query.length < 3) return [];
     const lang = language || getBrowserLanguage();
+    if (wikidataSearchAbort) {
+      wikidataSearchAbort.abort();
+    }
+    wikidataSearchAbort = new AbortController();
     try {
       const response = await axios.get(`${api_base_url}/api/1/wikidata_search`, {
         params: {q: query, language: lang},
         timeout: 10000,
+        signal: wikidataSearchAbort.signal,
       });
       return response.data.results || [];
-    } catch {
+    } catch (err) {
+      if (axios.isCancel(err) || err.name === 'CanceledError') return [];
       return [];
     }
   };

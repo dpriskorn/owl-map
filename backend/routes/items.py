@@ -4,13 +4,14 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
-from wikibaseintegrator.wbi_helpers import search_entities
+from wikibaseintegrator.wbi_helpers import search_entities, config
 
 from matcher import api
 
 router = APIRouter()
 
 USER_AGENT = "owl-map/1.0 (https://github.com/dpriskorn/owl-map)"
+config["USER_AGENT"] = USER_AGENT
 
 
 @router.get("/api/1/wikidata_search")
@@ -27,7 +28,17 @@ async def wikidata_search(request: Request) -> JSONResponse:
             max_results=50,
             dict_result=True,
         )
-        return JSONResponse({"results": results[:10], "language": language})
+        normalized = []
+        for r in results[:10]:
+            match = r.get("match", {})
+            if match.get("language") == language and match.get("type") == "label":
+                r["label"] = match.get("text", r["label"])
+            normalized.append({
+                "id": r["id"],
+                "label": r.get("label", r["id"]),
+                "description": r.get("description"),
+            })
+        return JSONResponse({"results": normalized, "language": language})
     except Exception as e:
         return JSONResponse({"results": [], "error": str(e)})
 
