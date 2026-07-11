@@ -33,9 +33,10 @@ const map = ref(null);
 const currentHit = ref(null);
 
 const addMarkersToMap = (item, mapInstance) => {
-  if (!item.wikidata?.markers) return;
+  const markers = item.markers || item.wikidata?.markers;
+  if (!markers) return;
 
-  item.markers.forEach(markerData => {
+  markers.forEach(markerData => {
     const marker = L.circleMarker([markerData.lat, markerData.lon], {
       radius: 5,
       color: 'blue',
@@ -98,8 +99,9 @@ watch(() => props.currentItem, (item) => {
 
   if (!item) return;
 
-  if (item.markers) {
-    item.markers.forEach(marker => {
+  const markers = item.markers || item.wikidata?.markers;
+  if (markers) {
+    markers.forEach(marker => {
       L.circleMarker([marker.lat, marker.lon], {
         radius: 20,
         color: 'orange',

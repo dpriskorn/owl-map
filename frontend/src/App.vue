@@ -5,9 +5,13 @@
       Backend is not available. Please ensure the API server is running on port 8080.
     </div>
 
-    <div class="alert alert-primary alert-map" role="alert" v-if="state.loading">
-      Found {{ state.item_count }} Wikidata items. Updating markers.
-      <span class="spinner-border spinner-border-sm"></span>
+    <div class="alert alert-info alert-map" role="alert" v-if="state.loading">
+      <span class="spinner-border spinner-border-sm me-2"></span>
+      Loading Wikidata items...
+    </div>
+
+    <div class="alert alert-primary alert-map" role="alert" v-if="!state.loading && state.item_count > 0">
+      Showing {{ state.item_count }} Wikidata items on map.
     </div>
 
     <div class="alert alert-primary alert-map" role="alert" v-if="state.area_too_big">
