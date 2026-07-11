@@ -24,10 +24,10 @@ async def wikidata_search(request: Request) -> JSONResponse:
         results = search_entities(
             search_string=q,
             language=language,
-            max_results=20,
+            max_results=50,
             dict_result=True,
         )
-        return JSONResponse({"results": results})
+        return JSONResponse({"results": results[:10], "language": language})
     except Exception as e:
         return JSONResponse({"results": [], "error": str(e)})
 

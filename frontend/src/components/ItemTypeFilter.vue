@@ -56,18 +56,14 @@ const searchQuery = computed({
 });
 
 const displayHits = computed(() => {
-  if (props.searchQuery && props.searchQuery.length >= 3 && props.searchResults.length > 0) {
+  if (props.searchQuery && props.searchQuery.length >= 3) {
     return props.searchResults.map(r => ({
       qid: r.id,
       label: r.label,
       description: r.description,
     }));
   }
-  if (!props.searchQuery) return props.itemTypeHits;
-  const q = props.searchQuery.toLowerCase();
-  return props.itemTypeHits.filter(h =>
-    h.label?.toLowerCase().includes(q)
-  );
+  return props.itemTypeHits;
 });
 
 const isTicked = (qid) => props.isaTicked.includes(qid);
