@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 
 import yaml
 
@@ -10,19 +11,28 @@ from matcher.qlever import qlever
 
 _queries_path = os.path.join(os.path.dirname(__file__), "queries.yaml")
 with open(_queries_path) as f:
-    QUERIES = yaml.safe_load(f)
+    _raw = yaml.safe_load(f)
+
+QUERIES = {k: v.strip() for k, v in _raw.items()}
+
+POINT_PATTERN = re.compile(r"POINT\(([0-9.-]+) ([0-9.-]+)\)")
+
+
+def _parse_point(coord_str: str) -> tuple[float, float] | None:
+    """Parse POINT(lon lat) string to (lat, lon) tuple."""
+    m = POINT_PATTERN.match(coord_str)
+    if m:
+        lon, lat = float(m.group(1)), float(m.group(2))
+        return (lat, lon)
+    return None
 
 
 def wikidata_items_count(bounds: list[float]) -> int:
-    """Count Wikidata items in bounding box via Qlever."""
-    lat_min, lon_min, lat_max, lon_max = bounds
-    query = QUERIES["wikidata_items_count"].format(
-        lat_min=lat_min, lon_min=lon_min,
-        lat_max=lat_max, lon_max=lon_max
-    )
+    """Count Wikidata items with coordinates via Qlever."""
+    query = QUERIES["wikidata_items_count"]
     result = qlever.execute_query(query)
     try:
-        return int(result["results"]["bindings"][0]["callret-0"]["value"])
+        return int(result["results"]["bindings"][0]["count"]["value"])
     except (KeyError, IndexError, ValueError):
         return 0
 
@@ -34,32 +44,28 @@ def wikidata_items(bounds: list[float]) -> dict:
     Labels are fetched by frontend from Wikidata REST API.
     """
     lat_min, lon_min, lat_max, lon_max = bounds
-    query = QUERIES["wikidata_items"].format(
-        lat_min=lat_min, lon_min=lon_min,
-        lat_max=lat_max, lon_max=lon_max
-    )
+    query = QUERIES["wikidata_items"]
     result = qlever.execute_query(query)
     items: dict[str, dict] = {}
     try:
         for binding in result["results"]["bindings"]:
             qid = binding["item"]["value"].split("/")[-1]
-            lat = float(binding["lat"]["value"])
-            lon = float(binding["lon"]["value"])
-            if qid not in items:
-                items[qid] = {"qid": qid, "markers": []}
-            items[qid]["markers"].append({"lat": lat, "lon": lon})
+            coord_str = binding["coord_str"]["value"]
+            coords = _parse_point(coord_str)
+            if coords:
+                lat, lon = coords
+                if lat_min <= lat <= lat_max and lon_min <= lon <= lon_max:
+                    if qid not in items:
+                        items[qid] = {"qid": qid, "markers": []}
+                    items[qid]["markers"].append({"lat": lat, "lon": lon})
     except (KeyError, ValueError):
         pass
     return {"items": items, "isa_count": []}
 
 
 def wikidata_isa_counts(bounds: list[float]) -> list[dict]:
-    """Get IsA type counts in bounding box via Qlever."""
-    lat_min, lon_min, lat_max, lon_max = bounds
-    query = QUERIES["wikidata_isa_counts"].format(
-        lat_min=lat_min, lon_min=lon_min,
-        lat_max=lat_max, lon_max=lon_max
-    )
+    """Get IsA type counts via Qlever (ignores bbox filter due to Qlever limitations)."""
+    query = QUERIES["wikidata_isa_counts"]
     result = qlever.execute_query(query)
     isa_count = []
     try:
@@ -77,8 +83,7 @@ def get_item_coordinates(qid: str) -> tuple[float, float] | None:
     query = QUERIES["get_item_coordinates"].format(qid=qid)
     result = qlever.execute_query(query)
     try:
-        lat = float(result["results"]["bindings"][0]["lat"]["value"])
-        lon = float(result["results"]["bindings"][0]["lon"]["value"])
-        return (lat, lon)
+        coord_str = result["results"]["bindings"][0]["coord"]["value"]
+        return _parse_point(coord_str)
     except (KeyError, IndexError, ValueError):
         return None

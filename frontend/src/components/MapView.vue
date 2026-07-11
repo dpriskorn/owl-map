@@ -26,6 +26,8 @@ const props = defineProps({
   currentOsm: {type: Object, default: null},
 });
 
+const MIN_ZOOM = 17;
+
 const emit = defineEmits(['item-click', 'bounds-change']);
 
 const mapEl = ref(null);
@@ -56,24 +58,26 @@ onMounted(() => {
 
   map.value.on('moveend', () => {
     const bounds = map.value.getBounds();
+    const zoom = map.value.getZoom();
     const boundsArray = [
       bounds.getSouthWest().lat,
       bounds.getSouthWest().lng,
       bounds.getNorthEast().lat,
       bounds.getNorthEast().lng,
     ];
-    emit('bounds-change', bounds, boundsArray);
+    emit('bounds-change', bounds, boundsArray, zoom);
   });
 
   // Initial load
   const bounds = map.value.getBounds();
+  const zoom = map.value.getZoom();
   const boundsArray = [
     bounds.getSouthWest().lat,
     bounds.getSouthWest().lng,
     bounds.getNorthEast().lat,
     bounds.getNorthEast().lng,
   ];
-  emit('bounds-change', bounds, boundsArray);
+  emit('bounds-change', bounds, boundsArray, zoom);
 });
 
 // Watch items and update markers

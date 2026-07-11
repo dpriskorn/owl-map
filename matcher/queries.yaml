@@ -1,37 +1,37 @@
 wikidata_items_count: |
-  SELECT COUNT(DISTINCT ?item) WHERE {
-    ?item wdt:P625 ?loc .
-    ?loc bd:lat ?lat .
-    ?loc bd:lon ?lon .
-    FILTER(?lat >= {lat_min} && ?lat <= {lat_max} &&
-           ?lon >= {lon_min} && ?lon <= {lon_max})
-  }
+  PREFIX wdt: <http://www.wikidata.org/prop/direct/>
+  PREFIX wd: <http://www.wikidata.org/entity/>
+  PREFIX bd: <http://www.bigdata.com/rdf#>
+  SELECT (COUNT(DISTINCT ?item) AS ?count) WHERE {{
+    ?item wdt:P625 ?coord .
+  }}
 
 wikidata_items: |
-  SELECT ?item ?lat ?lon WHERE {
-    ?item wdt:P625 ?loc .
-    ?loc bd:lat ?lat .
-    ?loc bd:lon ?lon .
-    FILTER(?lat >= {lat_min} && ?lat <= {lat_max} &&
-           ?lon >= {lon_min} && ?lon <= {lon_max})
-  }
+  PREFIX wdt: <http://www.wikidata.org/prop/direct/>
+  PREFIX wd: <http://www.wikidata.org/entity/>
+  PREFIX bd: <http://www.bigdata.com/rdf#>
+  PREFIX geo: <http://www.opengis.net/ont/geosparql#>
+  SELECT ?item (STR(?coord) AS ?coord_str) WHERE {{
+    ?item wdt:P625 ?coord .
+  }}
+  LIMIT 400
 
 wikidata_isa_counts: |
-  SELECT ?type (COUNT(DISTINCT ?item) AS ?count) WHERE {
+  PREFIX wdt: <http://www.wikidata.org/prop/direct/>
+  PREFIX wd: <http://www.wikidata.org/entity/>
+  PREFIX bd: <http://www.bigdata.com/rdf#>
+  SELECT ?type (COUNT(DISTINCT ?item) AS ?count) WHERE {{
     ?item wdt:P31 ?type ;
-          wdt:P625 ?loc .
-    ?loc bd:lat ?lat .
-    ?loc bd:lon ?lon .
-    FILTER(?lat >= {lat_min} && ?lat <= {lat_max} &&
-           ?lon >= {lon_min} && ?lon <= {lon_max})
-  }
+          wdt:P625 ?coord .
+  }}
   GROUP BY ?type
   ORDER BY DESC(?count)
   LIMIT 100
 
 get_item_coordinates: |
-  SELECT ?lat ?lon WHERE {
-    wd:{qid} wdt:P625 ?loc .
-    ?loc bd:lat ?lat .
-    ?loc bd:lon ?lon .
-  }
+  PREFIX wdt: <http://www.wikidata.org/prop/direct/>
+  PREFIX wd: <http://www.wikidata.org/entity/>
+  PREFIX bd: <http://www.bigdata.com/rdf#>
+  SELECT ?coord WHERE {{
+    wd:{qid} wdt:P625 ?coord .
+  }}

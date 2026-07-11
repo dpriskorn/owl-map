@@ -126,6 +126,8 @@ const {
   clearEdits,
   setItems,
   setLoading,
+  setAreaTooBig,
+  setTooManyItems,
   setError,
   setUploadState,
   resetUpload,
@@ -163,7 +165,14 @@ const handleItemClick = async (qid, marker) => {
   // Fetch detail in background
 };
 
-const handleBoundsChange = async (bounds, boundsArray) => {
+const handleBoundsChange = async (bounds, boundsArray, zoom) => {
+  if (zoom < 17) {
+    setAreaTooBig(true);
+    setTooManyItems(false);
+    setItems({});
+    return;
+  }
+  setAreaTooBig(false);
   setLoading(true);
   try {
     const response = await api.fetchItems(boundsArray);

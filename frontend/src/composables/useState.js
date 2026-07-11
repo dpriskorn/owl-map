@@ -174,6 +174,14 @@ export function useState() {
     state.loading = loading;
   };
 
+  const setAreaTooBig = (value) => {
+    state.area_too_big = value;
+  };
+
+  const setTooManyItems = (value) => {
+    state.too_many_items = value;
+  };
+
   const setError = (message, traceback = null) => {
     state.api_call_error_message = message;
     state.api_call_error_traceback = traceback;
@@ -227,6 +235,8 @@ export function useState() {
     clearIsaFilters,
     // UI actions
     setLoading,
+    setAreaTooBig,
+    setTooManyItems,
     setError,
     clearError,
     setUploadState,
