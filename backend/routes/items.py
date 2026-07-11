@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import requests
-
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 from wikibaseintegrator.wbi_helpers import search_entities, config
@@ -15,37 +13,10 @@ router = APIRouter()
 USER_AGENT = "owl-map/1.0 (https://github.com/dpriskorn/owl-map)"
 config["USER_AGENT"] = USER_AGENT
 
-WIKIDATA_REST_URL = "https://www.wikidata.org/w/rest.php/wikibase/v1"
-
-
-def _fetch_wikidata_labels(qids: list[str], language: str) -> dict[str, dict]:
-    """Fetch labels and descriptions from Wikidata REST API in specified language."""
-    results = {}
-    for qid in qids:
-        try:
-            url = f"{WIKIDATA_REST_URL}/entities/items/{qid}"
-            response = requests.get(
-                url,
-                headers={"User-Agent": USER_AGENT},
-                params={"languages": language},
-                timeout=10,
-            )
-            if response.status_code == 200:
-                data = response.json()
-                results[qid] = {
-                    "label": data.get("label", qid),
-                    "description": data.get("description"),
-                }
-            else:
-                results[qid] = {"label": qid, "description": None}
-        except Exception:
-            results[qid] = {"label": qid, "description": None}
-    return results
-
 
 @router.get("/api/1/wikidata_search")
 async def wikidata_search(request: Request) -> JSONResponse:
-    """Search Wikidata by label/alias using wikibaseintegrator."""
+    """Search Wikidata by label/alias using wikibaseintegrator. Returns QIDs only."""
     q = request.query_params.get("q", "")
     language = request.query_params.get("language", "en")
     if not q or len(q) < 3:
@@ -57,19 +28,8 @@ async def wikidata_search(request: Request) -> JSONResponse:
             max_results=50,
             dict_result=True,
         )
-        qids = [r["id"] for r in results[:10]]
-        wikidata_data = _fetch_wikidata_labels(qids, language)
-
-        normalized = []
-        for r in results[:10]:
-            qid = r["id"]
-            data = wikidata_data.get(qid, {"label": qid, "description": None})
-            normalized.append({
-                "id": qid,
-                "label": data["label"],
-                "description": data["description"],
-            })
-        return JSONResponse({"results": normalized, "language": language})
+        qids = [{"id": r["id"]} for r in results[:10]]
+        return JSONResponse({"results": qids, "language": language})
     except Exception as e:
         return JSONResponse({"results": [], "error": str(e)})
 

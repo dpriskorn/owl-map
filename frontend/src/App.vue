@@ -171,12 +171,23 @@ const stopHealthCheck = () => {
 
 // Debounce helper
 let searchTimeout = null;
-const debounceSearch = (query) => {
+const debounceSearch = async (query) => {
   if (searchTimeout) clearTimeout(searchTimeout);
   searchTimeout = setTimeout(async () => {
     if (query && query.length >= 3) {
-      const results = await api.searchWikidata(query);
-      setWikidataSearchResults(results);
+      const qidResults = await api.searchWikidata(query);
+      if (qidResults.length > 0) {
+        const qids = qidResults.map(r => r.id);
+        const details = await api.fetchWikidataDetails(qids);
+        const enriched = qidResults.map(r => ({
+          id: r.id,
+          label: details[r.id]?.label || r.id,
+          description: details[r.id]?.description || null,
+        }));
+        setWikidataSearchResults(enriched);
+      } else {
+        setWikidataSearchResults([]);
+      }
     } else {
       setWikidataSearchResults([]);
     }

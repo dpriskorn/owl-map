@@ -97,6 +97,32 @@ export function useApi() {
     return results;
   };
 
+  const fetchWikidataDetails = async (qids, language = null) => {
+    if (!qids || qids.length === 0) return {};
+    const lang = language || getBrowserLanguage();
+    const results = {};
+    await Promise.all(
+      qids.map(async (qid) => {
+        try {
+          const response = await axios.get(
+            `${wikidata_api_url}/entities/items/${qid}`,
+            {headers: {'User-Agent': user_agent}, params: {languages: lang}, timeout: 10000}
+          );
+          const data = response.data;
+          const labels = data.labels || {};
+          const descriptions = data.descriptions || {};
+          results[qid] = {
+            label: labels[lang]?.value || qid,
+            description: descriptions[lang]?.value || null,
+          };
+        } catch {
+          results[qid] = {label: qid, description: null};
+        }
+      })
+    );
+    return results;
+  };
+
   let wikidataSearchAbort = null;
 
   const searchWikidata = async (query, language = null) => {
@@ -132,6 +158,7 @@ export function useApi() {
     getCommonsUrl,
     healthCheck,
     fetchLabels,
+    fetchWikidataDetails,
     searchWikidata,
     api_base_url,
   };
