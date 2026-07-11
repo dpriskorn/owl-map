@@ -97,33 +97,57 @@ export function useApi() {
     return results;
   };
 
+  const wikidataCache = new Map();
+
   const fetchWikidataDetails = async (qids, language = null) => {
     if (!qids || qids.length === 0) return {};
     const lang = language || getBrowserLanguage();
     const results = {};
-    await Promise.all(
-      qids.map(async (qid) => {
-        try {
-          const [labelRes, descRes] = await Promise.all([
-            axios.get(
-              `${wikidata_api_url}/entities/items/${qid}/labels/${lang}`,
-              {headers: {'User-Agent': user_agent}, timeout: 10000}
-            ),
-            axios.get(
-              `${wikidata_api_url}/entities/items/${qid}/descriptions/${lang}`,
-              {headers: {'User-Agent': user_agent}, timeout: 10000}
-            ).catch(() => ({data: null})),
-          ]);
-          results[qid] = {
-            label: labelRes.data || qid,
-            description: descRes.data || null,
-          };
-        } catch {
-          results[qid] = {label: qid, description: null};
-        }
-      })
-    );
+    const uncached = [];
+
+    for (const qid of qids) {
+      const cacheKey = `${qid}:${lang}`;
+      if (wikidataCache.has(cacheKey)) {
+        results[qid] = wikidataCache.get(cacheKey);
+      } else {
+        uncached.push(qid);
+      }
+    }
+
+    if (uncached.length > 0) {
+      await Promise.all(
+        uncached.map(async (qid) => {
+          const cacheKey = `${qid}:${lang}`;
+          try {
+            const [labelRes, descRes] = await Promise.all([
+              axios.get(
+                `${wikidata_api_url}/entities/items/${qid}/labels/${lang}`,
+                {headers: {'User-Agent': user_agent}, timeout: 10000}
+              ),
+              axios.get(
+                `${wikidata_api_url}/entities/items/${qid}/descriptions/${lang}`,
+                {headers: {'User-Agent': user_agent}, timeout: 10000}
+              ).catch(() => ({data: null})),
+            ]);
+            const result = {
+              label: labelRes.data || qid,
+              description: descRes.data || null,
+            };
+            wikidataCache.set(cacheKey, result);
+            results[qid] = result;
+          } catch {
+            const result = {label: qid, description: null};
+            wikidataCache.set(cacheKey, result);
+            results[qid] = result;
+          }
+        })
+      );
+    }
     return results;
+  };
+
+  const clearWikidataCache = () => {
+    wikidataCache.clear();
   };
 
   let wikidataSearchAbort = null;
@@ -162,6 +186,7 @@ export function useApi() {
     healthCheck,
     fetchLabels,
     fetchWikidataDetails,
+    clearWikidataCache,
     searchWikidata,
     api_base_url,
   };

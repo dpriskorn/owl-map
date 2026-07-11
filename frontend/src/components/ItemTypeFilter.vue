@@ -51,6 +51,13 @@
     >
       Clear all
     </button>
+
+    <button
+      class="btn btn-sm btn-outline-danger mt-2"
+      @click="$emit('clear-cache')"
+    >
+      Clear cache
+    </button>
   </div>
 </template>
 
@@ -64,7 +71,7 @@ const props = defineProps({
   searchQuery: {type: String, default: ''},
 });
 
-const emit = defineEmits(['toggle-isa', 'clear-all', 'update:search']);
+const emit = defineEmits(['toggle-isa', 'clear-all', 'update:search', 'clear-cache']);
 
 const searchQuery = computed({
   get: () => props.searchQuery || '',

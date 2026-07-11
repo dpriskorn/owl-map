@@ -73,6 +73,7 @@
             @toggle-isa="handleToggleIsa"
             @clear-all="clearIsaFilters"
             @update:search="state.item_type_search = $event"
+            @clear-cache="api.clearWikidataCache()"
           />
 
           <ItemList
