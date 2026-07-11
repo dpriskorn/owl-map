@@ -1,0 +1,37 @@
+wikidata_items_count: |
+  SELECT COUNT(DISTINCT ?item) WHERE {
+    ?item wdt:P625 ?loc .
+    ?loc bd:lat ?lat .
+    ?loc bd:lon ?lon .
+    FILTER(?lat >= {lat_min} && ?lat <= {lat_max} &&
+           ?lon >= {lon_min} && ?lon <= {lon_max})
+  }
+
+wikidata_items: |
+  SELECT ?item ?lat ?lon WHERE {
+    ?item wdt:P625 ?loc .
+    ?loc bd:lat ?lat .
+    ?loc bd:lon ?lon .
+    FILTER(?lat >= {lat_min} && ?lat <= {lat_max} &&
+           ?lon >= {lon_min} && ?lon <= {lon_max})
+  }
+
+wikidata_isa_counts: |
+  SELECT ?type (COUNT(DISTINCT ?item) AS ?count) WHERE {
+    ?item wdt:P31 ?type ;
+          wdt:P625 ?loc .
+    ?loc bd:lat ?lat .
+    ?loc bd:lon ?lon .
+    FILTER(?lat >= {lat_min} && ?lat <= {lat_max} &&
+           ?lon >= {lon_min} && ?lon <= {lon_max})
+  }
+  GROUP BY ?type
+  ORDER BY DESC(?count)
+  LIMIT 100
+
+get_item_coordinates: |
+  SELECT ?lat ?lon WHERE {
+    wd:{qid} wdt:P625 ?loc .
+    ?loc bd:lat ?lat .
+    ?loc bd:lon ?lon .
+  }

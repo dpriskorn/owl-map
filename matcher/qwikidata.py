@@ -2,21 +2,24 @@
 
 from __future__ import annotations
 
+import os
+
+import yaml
+
 from matcher.qlever import qlever
+
+_queries_path = os.path.join(os.path.dirname(__file__), "queries.yaml")
+with open(_queries_path) as f:
+    QUERIES = yaml.safe_load(f)
 
 
 def wikidata_items_count(bounds: list[float]) -> int:
     """Count Wikidata items in bounding box via Qlever."""
     lat_min, lon_min, lat_max, lon_max = bounds
-    query = f"""
-    SELECT COUNT(DISTINCT ?item) WHERE {{
-      ?item wdt:P625 ?coord .
-      ?coord wikibase:geoLatitude ?lat .
-      ?coord wikibase:geoLongitude ?lon .
-      FILTER(?lat >= {lat_min} && ?lat <= {lat_max} &&
-             ?lon >= {lon_min} && ?lon <= {lon_max})
-    }}
-    """
+    query = QUERIES["wikidata_items_count"].format(
+        lat_min=lat_min, lon_min=lon_min,
+        lat_max=lat_max, lon_max=lon_max
+    )
     result = qlever.execute_query(query)
     try:
         return int(result["results"]["bindings"][0]["callret-0"]["value"])
@@ -31,15 +34,10 @@ def wikidata_items(bounds: list[float]) -> dict:
     Labels are fetched by frontend from Wikidata REST API.
     """
     lat_min, lon_min, lat_max, lon_max = bounds
-    query = f"""
-    SELECT ?item ?lat ?lon WHERE {{
-      ?item wdt:P625 ?coord .
-      ?coord wikibase:geoLatitude ?lat .
-      ?coord wikibase:geoLongitude ?lon .
-      FILTER(?lat >= {lat_min} && ?lat <= {lat_max} &&
-             ?lon >= {lon_min} && ?lon <= {lon_max})
-    }}
-    """
+    query = QUERIES["wikidata_items"].format(
+        lat_min=lat_min, lon_min=lon_min,
+        lat_max=lat_max, lon_max=lon_max
+    )
     result = qlever.execute_query(query)
     items: dict[str, dict] = {}
     try:
@@ -58,19 +56,10 @@ def wikidata_items(bounds: list[float]) -> dict:
 def wikidata_isa_counts(bounds: list[float]) -> list[dict]:
     """Get IsA type counts in bounding box via Qlever."""
     lat_min, lon_min, lat_max, lon_max = bounds
-    query = f"""
-    SELECT ?type (COUNT(DISTINCT ?item) AS ?count) WHERE {{
-      ?item wdt:P31 ?type ;
-            wdt:P625 ?coord .
-      ?coord wikibase:geoLatitude ?lat .
-      ?coord wikibase:geoLongitude ?lon .
-      FILTER(?lat >= {lat_min} && ?lat <= {lat_max} &&
-             ?lon >= {lon_min} && ?lon <= {lon_max})
-    }}
-    GROUP BY ?type
-    ORDER BY DESC(?count)
-    LIMIT 100
-    """
+    query = QUERIES["wikidata_isa_counts"].format(
+        lat_min=lat_min, lon_min=lon_min,
+        lat_max=lat_max, lon_max=lon_max
+    )
     result = qlever.execute_query(query)
     isa_count = []
     try:
@@ -85,13 +74,7 @@ def wikidata_isa_counts(bounds: list[float]) -> list[dict]:
 
 def get_item_coordinates(qid: str) -> tuple[float, float] | None:
     """Get coordinates for a single Wikidata item via Qlever."""
-    query = f"""
-    SELECT ?lat ?lon WHERE {{
-      wd:{qid} wdt:P625 ?coord .
-      ?coord wikibase:geoLatitude ?lat .
-      ?coord wikibase:geoLongitude ?lon .
-    }}
-    """
+    query = QUERIES["get_item_coordinates"].format(qid=qid)
     result = qlever.execute_query(query)
     try:
         lat = float(result["results"]["bindings"][0]["lat"]["value"])
