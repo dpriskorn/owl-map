@@ -14,7 +14,13 @@ timeout = 20_000  # 20 seconds
 
 def init_db(db_url: str, echo: bool = False) -> None:
     """Initialise database."""
-    session.configure(bind=get_engine(db_url, echo=echo))
+    engine = get_engine(db_url, echo=echo)
+    try:
+        connection = engine.connect()
+        connection.close()
+    except Exception as e:
+        raise RuntimeError(f"Database connection failed: {e}") from e
+    session.configure(bind=engine)
 
 
 def get_engine(db_url: str, echo: bool = False) -> sqlalchemy.engine.base.Engine:
