@@ -233,7 +233,18 @@ const handleBoundsChange = async (bounds, boundsArray, zoom) => {
         api.fetchItems(boundsArray),
         api.fetchIsaCounts(boundsArray),
       ]);
-      setItems(itemsResponse.data.items);
+      const items = itemsResponse.data.items;
+      const qids = Object.keys(items);
+      if (qids.length > 0) {
+        const labels = await api.fetchWikidataDetails(qids);
+        for (const qid of qids) {
+          if (labels[qid]) {
+            items[qid].wikidata = items[qid].wikidata || {};
+            items[qid].wikidata.label = labels[qid].label;
+          }
+        }
+      }
+      setItems(items);
       setItemTypeHits(isaResponse.data.isa_count || []);
     } catch (err) {
       setError(err.api_call_error_message, err.api_call_error_traceback);
