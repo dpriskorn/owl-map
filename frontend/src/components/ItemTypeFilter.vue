@@ -2,6 +2,22 @@
   <div class="p-3">
     <h6>Item type filters</h6>
 
+    <div v-if="isaTicked.length" class="mb-2 d-flex flex-wrap gap-1">
+      <span
+        v-for="item in selectedItems"
+        :key="item.qid"
+        class="badge bg-primary d-flex align-items-center gap-1"
+      >
+        {{ item.label || item.qid }}
+        <button
+          type="button"
+          class="btn-close btn-close-white"
+          style="font-size: 0.5rem;"
+          @click.prevent="$emit('toggle-isa', item.qid)"
+        ></button>
+      </span>
+    </div>
+
     <input
       v-model="searchQuery"
       type="text"
@@ -21,7 +37,6 @@
           {{ hit.label || hit.qid || hit.id }}
         </span>
         <small v-if="hit.description" class="text-muted">{{ hit.description }}</small>
-        <span v-if="hit.count" class="badge bg-secondary mt-1">{{ hit.count?.toLocaleString() }}</span>
       </a>
     </div>
 
@@ -54,6 +69,18 @@ const emit = defineEmits(['toggle-isa', 'clear-all', 'update:search']);
 const searchQuery = computed({
   get: () => props.searchQuery || '',
   set: (val) => emit('update:search', val),
+});
+
+const selectedItems = computed(() => {
+  const allItems = [...props.searchResults, ...props.itemTypeHits];
+  const unique = new Map();
+  for (const item of allItems) {
+    const qid = item.qid || item.id;
+    if (props.isaTicked.includes(qid) && !unique.has(qid)) {
+      unique.set(qid, {qid, label: item.label || item.qid || item.id});
+    }
+  }
+  return Array.from(unique.values());
 });
 
 const displayHits = computed(() => {
