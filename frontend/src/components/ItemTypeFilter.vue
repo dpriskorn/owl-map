@@ -9,19 +9,23 @@
       placeholder="Search type..."
     >
 
-    <div v-if="filteredHits.length" class="list-group">
+    <div v-if="displayHits.length" class="list-group">
       <a
-        v-for="hit in filteredHits"
-        :key="hit.qid"
+        v-for="hit in displayHits"
+        :key="hit.qid || hit.id"
         class="list-group-item d-flex justify-content-between align-items-center"
         href="#"
-        @click.prevent="$emit('toggle-isa', hit.qid)"
+        @click.prevent="$emit('toggle-isa', hit.qid || hit.id)"
       >
-        <span :class="isTicked(hit.qid) ? 'fw-bold' : ''">
-          {{ hit.label }}
+        <span :class="isTicked(hit.qid || hit.id) ? 'fw-bold' : ''">
+          {{ hit.label || hit.qid || hit.id }}
         </span>
-        <span class="badge bg-secondary">{{ hit.count?.toLocaleString() }}</span>
+        <span v-if="hit.count" class="badge bg-secondary">{{ hit.count?.toLocaleString() }}</span>
       </a>
+    </div>
+
+    <div v-else-if="searchQuery && searchQuery.length >= 3" class="text-muted small">
+      No results found
     </div>
 
     <button
@@ -40,6 +44,7 @@ import {computed} from 'vue';
 const props = defineProps({
   isaTicked: {type: Array, default: () => []},
   itemTypeHits: {type: Array, default: () => []},
+  searchResults: {type: Array, default: () => []},
   searchQuery: {type: String, default: ''},
 });
 
@@ -50,7 +55,14 @@ const searchQuery = computed({
   set: (val) => emit('update:search', val),
 });
 
-const filteredHits = computed(() => {
+const displayHits = computed(() => {
+  if (props.searchQuery && props.searchQuery.length >= 3 && props.searchResults.length > 0) {
+    return props.searchResults.map(r => ({
+      qid: r.id,
+      label: r.label,
+      description: r.description,
+    }));
+  }
   if (!props.searchQuery) return props.itemTypeHits;
   const q = props.searchQuery.toLowerCase();
   return props.itemTypeHits.filter(h =>

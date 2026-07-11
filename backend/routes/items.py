@@ -4,24 +4,32 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
+from wikibaseintegrator.wbi_helpers import search_entities
 
 from matcher import api
 
 router = APIRouter()
 
+USER_AGENT = "owl-map/1.0 (https://github.com/dpriskorn/owl-map)"
 
-@router.get("/api/1/count")
-async def count_items(request: Request) -> JSONResponse:
-    """Count Wikidata items in the given bounds via Qlever."""
-    bbox_str = request.query_params.get("bbox", "")
+
+@router.get("/api/1/wikidata_search")
+async def wikidata_search(request: Request) -> JSONResponse:
+    """Search Wikidata by label/alias using wikibaseintegrator."""
+    q = request.query_params.get("q", "")
+    language = request.query_params.get("language", "en")
+    if not q or len(q) < 3:
+        return JSONResponse({"results": []})
     try:
-        bbox = [float(x) for x in bbox_str.split(",")] if bbox_str else None
-        if not bbox or len(bbox) != 4:
-            return JSONResponse({"count": 0})
-        count = api.wikidata_items_count(bbox)
-        return JSONResponse({"count": count})
-    except ValueError:
-        return JSONResponse({"count": 0})
+        results = search_entities(
+            search_string=q,
+            language=language,
+            max_results=20,
+            dict_result=True,
+        )
+        return JSONResponse({"results": results})
+    except Exception as e:
+        return JSONResponse({"results": [], "error": str(e)})
 
 
 @router.get("/api/1/items")

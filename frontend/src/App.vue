@@ -68,6 +68,7 @@
             v-if="state.show_item_type_filter"
             :isa-ticked="state.isa_ticked"
             :item-type-hits="state.item_type_hits"
+            :search-results="state.wikidata_search_results"
             :search-query="state.item_type_search"
             @toggle-isa="handleToggleIsa"
             @clear-all="clearIsaFilters"
@@ -106,7 +107,7 @@
 </template>
 
 <script setup>
-import {ref, onMounted, onUnmounted} from 'vue';
+import {ref, watch, onMounted, onUnmounted} from 'vue';
 import MapView from './components/MapView.vue';
 import AppSidebar from './components/AppSidebar.vue';
 import SearchPanel from './components/SearchPanel.vue';
@@ -141,6 +142,7 @@ const {
   setCurrentHit,
   setWikidataDetail,
   setItemTypeHits,
+  setWikidataSearchResults,
   toggleIsa,
   clearIsaFilters,
 } = useState();
@@ -166,6 +168,24 @@ const stopHealthCheck = () => {
     healthCheckInterval = null;
   }
 };
+
+// Debounce helper
+let searchTimeout = null;
+const debounceSearch = (query) => {
+  if (searchTimeout) clearTimeout(searchTimeout);
+  searchTimeout = setTimeout(async () => {
+    if (query && query.length >= 3) {
+      const results = await api.searchWikidata(query);
+      setWikidataSearchResults(results);
+    } else {
+      setWikidataSearchResults([]);
+    }
+  }, 300);
+};
+
+watch(() => state.item_type_search, (newQuery) => {
+  debounceSearch(newQuery);
+});
 
 // Map event handlers
 const handleItemClick = async (qid, marker) => {

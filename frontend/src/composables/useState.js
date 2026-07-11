@@ -42,6 +42,7 @@ export function useState() {
     show_item_type_filter: false,
     item_type_search: '',
     item_type_hits: [],
+    wikidata_search_results: [],
 
     // Item detail
     wd_item: null,
@@ -174,6 +175,10 @@ export function useState() {
     state.item_type_hits = hits;
   };
 
+  const setWikidataSearchResults = (results) => {
+    state.wikidata_search_results = results;
+  };
+
   // UI actions
   const setLoading = (loading) => {
     state.loading = loading;
@@ -239,6 +244,7 @@ export function useState() {
     toggleIsa,
     clearIsaFilters,
     setItemTypeHits,
+    setWikidataSearchResults,
     // UI actions
     setLoading,
     setAreaTooBig,

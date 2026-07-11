@@ -97,6 +97,20 @@ export function useApi() {
     return results;
   };
 
+  const searchWikidata = async (query, language = null) => {
+    if (!query || query.length < 3) return [];
+    const lang = language || getBrowserLanguage();
+    try {
+      const response = await axios.get(`${api_base_url}/api/1/wikidata_search`, {
+        params: {q: query, language: lang},
+        timeout: 10000,
+      });
+      return response.data.results || [];
+    } catch {
+      return [];
+    }
+  };
+
   return {
     api_call,
     fetchItems,
@@ -110,6 +124,7 @@ export function useApi() {
     getCommonsUrl,
     healthCheck,
     fetchLabels,
+    searchWikidata,
     api_base_url,
   };
 }

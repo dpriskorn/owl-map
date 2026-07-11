@@ -26,8 +26,6 @@ const props = defineProps({
   currentOsm: {type: Object, default: null},
 });
 
-const MIN_ZOOM = parseInt(import.meta.env.VITE_MIN_ZOOM || '13', 10);
-
 const emit = defineEmits(['item-click', 'bounds-change']);
 
 const mapEl = ref(null);
