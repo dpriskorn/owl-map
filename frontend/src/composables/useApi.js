@@ -19,10 +19,13 @@ export function useApi() {
 
   let itemsAbort = null;
 
-  const fetchItems = async (bbox) => {
+  const fetchItems = async (bbox, isaTypes = null) => {
     if (itemsAbort) itemsAbort.abort();
     itemsAbort = new AbortController();
     const params = {bbox: bbox.join(',')};
+    if (isaTypes && isaTypes.length > 0) {
+      params.isa = isaTypes.join(',');
+    }
     try {
       return await api_call('items', {params, signal: itemsAbort.signal});
     } catch (err) {

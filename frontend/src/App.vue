@@ -229,8 +229,9 @@ const handleBoundsChange = async (bounds, boundsArray, zoom) => {
     setAreaTooBig(false);
     setLoading(true);
     try {
+      const isaTypes = state.isa_ticked.length > 0 ? state.isa_ticked : null;
       const [itemsResponse, isaResponse] = await Promise.all([
-        api.fetchItems(boundsArray),
+        api.fetchItems(boundsArray, isaTypes),
         api.fetchIsaCounts(boundsArray),
       ]);
       const items = itemsResponse.data.items;

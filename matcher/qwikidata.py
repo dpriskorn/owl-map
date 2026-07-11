@@ -58,15 +58,22 @@ def _build_sparql_filter(bounds: list[float]) -> str:
     return f"FILTER(({lon_filter}) && ({lat_filter}))"
 
 
-def _build_items_query(bounds: list[float]) -> str:
-    """Build SPARQL query for items with bbox filter."""
+def _build_items_query(bounds: list[float], isa_types: list[str] | None = None) -> str:
+    """Build SPARQL query for items with bbox filter and optional ISA type filter."""
     bbox_filter = _build_sparql_filter(bounds)
+
+    isa_filter = ""
+    if isa_types:
+        type_list = ", ".join(f"wd:{isa}" for isa in isa_types)
+        isa_filter = f"?item wdt:P31 ?type . FILTER(?type IN ({type_list}))"
+
     return f"""PREFIX wdt: <http://www.wikidata.org/prop/direct/>
 PREFIX wd: <http://www.wikidata.org/entity/>
 PREFIX bd: <http://www.bigdata.com/rdf#>
 SELECT ?item (STR(?coord) AS ?coord_str) WHERE {{
   ?item wdt:P625 ?coord .
   {bbox_filter}
+  {isa_filter}
 }}
 LIMIT 400"""
 
@@ -81,7 +88,7 @@ def wikidata_items_count(bounds: list[float]) -> int:
         return 0
 
 
-def wikidata_items(bounds: list[float]) -> dict:
+def wikidata_items(bounds: list[float], isa_types: list[str] | None = None) -> dict:
     """Get Wikidata items in bounding box via Qlever.
 
     Returns items dict keyed by QID, each with markers array.
@@ -89,7 +96,7 @@ def wikidata_items(bounds: list[float]) -> dict:
     Labels are fetched by frontend from Wikidata REST API.
     """
     lat_min, lon_min, lat_max, lon_max = bounds
-    query = _build_items_query(bounds)
+    query = _build_items_query(bounds, isa_types)
     result = qlever.execute_query(query)
     items: dict[str, dict] = {}
     try:

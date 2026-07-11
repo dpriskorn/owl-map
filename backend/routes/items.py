@@ -38,11 +38,13 @@ async def wikidata_search(request: Request) -> JSONResponse:
 async def get_items(request: Request) -> JSONResponse:
     """Get Wikidata items in bounds via Qlever."""
     bbox_str = request.query_params.get("bbox", "")
+    isa_str = request.query_params.get("isa", "")
     try:
         bbox = [float(x) for x in bbox_str.split(",")] if bbox_str else None
         if not bbox or len(bbox) != 4:
             return JSONResponse({"items": {}})
-        result = api.wikidata_items(bbox)
+        isa_types = isa_str.split(",") if isa_str else None
+        result = api.wikidata_items(bbox, isa_types)
         return JSONResponse(result)
     except ValueError:
         return JSONResponse({"items": {}})
