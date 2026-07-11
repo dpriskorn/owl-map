@@ -23,7 +23,7 @@ from sqlalchemy.orm import (
 )
 from sqlalchemy.orm.decl_api import DeclarativeMeta
 from sqlalchemy.schema import Column
-from sqlalchemy.types import Float, Integer, String
+from sqlalchemy.types import BigInteger, Float, Integer, String
 
 from .database import session
 
@@ -212,3 +212,27 @@ class User(Base):
 
     def is_active(self) -> bool:
         return True
+
+
+class Changeset(Base):
+    """OSM changeset record."""
+
+    __tablename__ = "changeset"
+
+    id = Column(BigInteger, primary_key=True)
+    created = Column(sqlalchemy.DateTime)
+    comment = Column(String)
+    user_id = Column(Integer)
+    update_count = Column(Integer)
+
+
+class EditSession(Base):
+    """Edit session record."""
+
+    __tablename__ = "edit_session"
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer)
+    created = Column(sqlalchemy.DateTime)
+    edit_list = Column(postgresql.JSONB)
+    comment = Column(String)
