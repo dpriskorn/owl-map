@@ -185,3 +185,30 @@ class Polygon(MapMixin, Base):
         """Size of area in square km."""
         area: float = self.area
         return area / (1000 * 1000)
+
+
+class User(Base):
+    """User model for authentication (stored in PostgreSQL)."""
+
+    __tablename__ = "user"
+
+    id = Column(Integer, primary_key=True)
+    username = Column(String)
+    osm_id = Column(Integer, index=True)
+    osm_oauth_token = Column(String)
+    osm_oauth_token_secret = Column(String)
+    mock_upload = Column(sqlalchemy.Boolean, default=False)
+
+    @property
+    def is_authenticated(self) -> bool:
+        return True
+
+    @property
+    def is_anonymous(self) -> bool:
+        return False
+
+    def get_id(self) -> str:
+        return str(self.id)
+
+    def is_active(self) -> bool:
+        return True
