@@ -72,15 +72,21 @@ export function useApi() {
     }
   };
 
-  const fetchLabels = async (qids) => {
+  const getBrowserLanguage = () => {
+    const lang = navigator.language || navigator.userLanguage || 'en';
+    return lang.split('-')[0];
+  };
+
+  const fetchLabels = async (qids, language = null) => {
     if (!qids || qids.length === 0) return {};
+    const lang = language || getBrowserLanguage();
     const results = {};
     await Promise.all(
       qids.map(async (qid) => {
         try {
           const response = await axios.get(
             `${wikidata_api_url}/entities/items/${qid}/labels`,
-            {headers: {'User-Agent': user_agent}, timeout: 10000}
+            {headers: {'User-Agent': user_agent}, params: {language: lang}, timeout: 10000}
           );
           results[qid] = response.data;
         } catch {

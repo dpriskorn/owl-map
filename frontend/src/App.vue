@@ -68,14 +68,18 @@
             v-if="state.show_item_type_filter"
             :isa-ticked="state.isa_ticked"
             :item-type-hits="state.item_type_hits"
+            :search-query="state.item_type_search"
             @toggle-isa="handleToggleIsa"
             @clear-all="clearIsaFilters"
+            @update:search="state.item_type_search = $event"
           />
 
           <ItemList
             v-else
             :items="visibleItems"
+            :show-filter="state.show_item_type_filter"
             @open-item="handleOpenItem"
+            @update:showFilter="state.show_item_type_filter = $event"
           />
         </template>
       </AppSidebar>
@@ -135,6 +139,8 @@ const {
   resetUpload,
   setHits,
   setCurrentHit,
+  setWikidataDetail,
+  setItemTypeHits,
   toggleIsa,
   clearIsaFilters,
 } = useState();
@@ -164,7 +170,10 @@ const stopHealthCheck = () => {
 // Map event handlers
 const handleItemClick = async (qid, marker) => {
   openItem(qid, marker);
-  // Fetch detail in background
+  const labels = await api.fetchLabels([qid]);
+  if (labels[qid]) {
+    setWikidataDetail(qid, labels[qid]);
+  }
 };
 
 const handleBoundsChange = async (bounds, boundsArray, zoom) => {
@@ -178,8 +187,12 @@ const handleBoundsChange = async (bounds, boundsArray, zoom) => {
   setAreaTooBig(false);
   setLoading(true);
   try {
-    const response = await api.fetchItems(boundsArray);
-    setItems(response.data.items);
+    const [itemsResponse, isaResponse] = await Promise.all([
+      api.fetchItems(boundsArray),
+      api.fetchIsaCounts(boundsArray),
+    ]);
+    setItems(itemsResponse.data.items);
+    setItemTypeHits(isaResponse.data.isa_count || []);
   } catch (err) {
     setError(err.api_call_error_message, err.api_call_error_traceback);
   } finally {

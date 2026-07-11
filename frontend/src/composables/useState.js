@@ -167,6 +167,11 @@ export function useState() {
 
   const clearIsaFilters = () => {
     state.isa_ticked = [];
+    state.item_type_search = '';
+  };
+
+  const setItemTypeHits = (hits) => {
+    state.item_type_hits = hits;
   };
 
   // UI actions
@@ -233,6 +238,7 @@ export function useState() {
     // Filter actions
     toggleIsa,
     clearIsaFilters,
+    setItemTypeHits,
     // UI actions
     setLoading,
     setAreaTooBig,

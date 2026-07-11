@@ -3,9 +3,10 @@
     <div class="form-check form-switch mb-3">
       <input
         id="show-filter"
-        v-model="showFilter"
+        :checked="showFilter"
         type="checkbox"
         class="form-check-input"
+        @change="$emit('update:showFilter', $event.target.checked)"
       >
       <label class="form-check-label" for="show-filter">
         Item type filter
@@ -35,13 +36,10 @@
 </template>
 
 <script setup>
-import {ref} from 'vue';
-
 defineProps({
   items: {type: Array, default: () => []},
+  showFilter: {type: Boolean, default: false},
 });
 
-defineEmits(['open-item']);
-
-const showFilter = ref(false);
+defineEmits(['open-item', 'update:showFilter']);
 </script>
