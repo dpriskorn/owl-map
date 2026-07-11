@@ -104,16 +104,19 @@ export function useApi() {
     await Promise.all(
       qids.map(async (qid) => {
         try {
-          const response = await axios.get(
-            `${wikidata_api_url}/entities/items/${qid}`,
-            {headers: {'User-Agent': user_agent}, params: {languages: lang}, timeout: 10000}
-          );
-          const data = response.data;
-          const labels = data.labels || {};
-          const descriptions = data.descriptions || {};
+          const [labelRes, descRes] = await Promise.all([
+            axios.get(
+              `${wikidata_api_url}/entities/items/${qid}/labels/${lang}`,
+              {headers: {'User-Agent': user_agent}, timeout: 10000}
+            ),
+            axios.get(
+              `${wikidata_api_url}/entities/items/${qid}/descriptions/${lang}`,
+              {headers: {'User-Agent': user_agent}, timeout: 10000}
+            ).catch(() => ({data: null})),
+          ]);
           results[qid] = {
-            label: labels[lang]?.value || qid,
-            description: descriptions[lang]?.value || null,
+            label: labelRes.data?.label || qid,
+            description: descRes.data?.description || null,
           };
         } catch {
           results[qid] = {label: qid, description: null};
