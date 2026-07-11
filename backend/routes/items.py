@@ -16,11 +16,10 @@ async def count_items(request: Request) -> JSONResponse:
     """Count Wikidata items in the given bounds."""
     bbox_str = request.query_params.get("bbox", "")
     types_param = request.query_params.get("types", "")
-    item_type = request.query_params.get("type", "")
     try:
         bbox = [float(x) for x in bbox_str.split(",")] if bbox_str else None
         item_types = types_param.split(",") if types_param else []
-        count = api.wikidata_items_count(bbox, item_types, item_type)
+        count = api.wikidata_items_count(bbox, item_types)
         return JSONResponse({"count": count})
     except ValueError:
         return JSONResponse({"count": 0})
@@ -31,11 +30,10 @@ async def get_items(request: Request) -> JSONResponse:
     """Get Wikidata items in bounds."""
     bbox_str = request.query_params.get("bbox", "")
     types_param = request.query_params.get("types", "")
-    item_type = request.query_params.get("type", "")
     try:
         bbox = [float(x) for x in bbox_str.split(",")] if bbox_str else None
         item_types = types_param.split(",") if types_param else []
-        items = api.wikidata_items(bbox, item_types, item_type)
+        items = api.wikidata_items(bbox, item_types)
         return JSONResponse({"items": items})
     except ValueError:
         return JSONResponse({"items": []})
