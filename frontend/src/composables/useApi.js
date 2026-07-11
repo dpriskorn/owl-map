@@ -17,9 +17,18 @@ export function useApi() {
     }
   };
 
+  let itemsAbort = null;
+
   const fetchItems = async (bbox) => {
+    if (itemsAbort) itemsAbort.abort();
+    itemsAbort = new AbortController();
     const params = {bbox: bbox.join(',')};
-    return api_call('items', {params});
+    try {
+      return await api_call('items', {params, signal: itemsAbort.signal});
+    } catch (err) {
+      if (axios.isCancel(err) || err.name === 'CanceledError') return {data: {items: {}}};
+      throw err;
+    }
   };
 
   const fetchItemCount = async (bbox) => {
@@ -27,8 +36,17 @@ export function useApi() {
     return api_call('count', {params});
   };
 
+  let isaAbort = null;
+
   const fetchIsaCounts = async (bbox) => {
-    return api_call('isa', {params: {bbox: bbox.join(',')}});
+    if (isaAbort) isaAbort.abort();
+    isaAbort = new AbortController();
+    try {
+      return await api_call('isa', {params: {bbox: bbox.join(',')}, signal: isaAbort.signal});
+    } catch (err) {
+      if (axios.isCancel(err) || err.name === 'CanceledError') return {data: {isa_count: []}};
+      throw err;
+    }
   };
 
   const fetchLocation = async (ip) => {
