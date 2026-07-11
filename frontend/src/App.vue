@@ -205,35 +205,42 @@ watch(() => state.item_type_search, (newQuery) => {
 
 // Map event handlers
 const handleItemClick = async (qid, marker) => {
-  openItem(qid, marker);
-  const labels = await api.fetchLabels([qid]);
-  if (labels[qid]) {
-    setWikidataDetail(qid, labels[qid]);
+  const item = state.items[qid];
+  if (item) {
+    openItem(item, marker);
+    const labels = await api.fetchLabels([qid]);
+    if (labels[qid]) {
+      setWikidataDetail(qid, labels[qid]);
+    }
   }
 };
 
+let boundsChangeTimeout = null;
+
 const handleBoundsChange = async (bounds, boundsArray, zoom) => {
-  console.debug('handleBoundsChange', {zoom, MIN_ZOOM});
-  if (zoom < MIN_ZOOM) {
-    setAreaTooBig(true);
-    setTooManyItems(false);
-    setItems({});
-    return;
-  }
-  setAreaTooBig(false);
-  setLoading(true);
-  try {
-    const [itemsResponse, isaResponse] = await Promise.all([
-      api.fetchItems(boundsArray),
-      api.fetchIsaCounts(boundsArray),
-    ]);
-    setItems(itemsResponse.data.items);
-    setItemTypeHits(isaResponse.data.isa_count || []);
-  } catch (err) {
-    setError(err.api_call_error_message, err.api_call_error_traceback);
-  } finally {
-    setLoading(false);
-  }
+  if (boundsChangeTimeout) clearTimeout(boundsChangeTimeout);
+  boundsChangeTimeout = setTimeout(async () => {
+    if (zoom < MIN_ZOOM) {
+      setAreaTooBig(true);
+      setTooManyItems(false);
+      setItems({});
+      return;
+    }
+    setAreaTooBig(false);
+    setLoading(true);
+    try {
+      const [itemsResponse, isaResponse] = await Promise.all([
+        api.fetchItems(boundsArray),
+        api.fetchIsaCounts(boundsArray),
+      ]);
+      setItems(itemsResponse.data.items);
+      setItemTypeHits(isaResponse.data.isa_count || []);
+    } catch (err) {
+      setError(err.api_call_error_message, err.api_call_error_traceback);
+    } finally {
+      setLoading(false);
+    }
+  }, 300);
 };
 
 // Search handlers

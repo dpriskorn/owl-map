@@ -31,11 +31,14 @@ const emit = defineEmits(['item-click', 'bounds-change']);
 const mapEl = ref(null);
 const map = ref(null);
 const currentHit = ref(null);
+const markerMap = new Map();
 
 const addMarkersToMap = (item, mapInstance) => {
   const markers = item.markers || item.wikidata?.markers;
   if (!markers) return;
+  if (markerMap.has(item.qid)) return;
 
+  const markersList = [];
   markers.forEach(markerData => {
     const marker = L.circleMarker([markerData.lat, markerData.lon], {
       radius: 5,
@@ -43,9 +46,17 @@ const addMarkersToMap = (item, mapInstance) => {
     });
     marker.on('click', () => emit('item-click', item.qid, marker));
     marker.addTo(mapInstance);
-    item._markers = item._markers || [];
-    item._markers.push(marker);
+    markersList.push(marker);
   });
+  markerMap.set(item.qid, markersList);
+};
+
+const removeMarkersForItem = (qid) => {
+  const markers = markerMap.get(qid);
+  if (markers) {
+    markers.forEach(m => m.removeFrom(map.value));
+    markerMap.delete(qid);
+  }
 };
 
 const DEFAULT_LAT = parseFloat(import.meta.env.VITE_DEFAULT_LAT || '62.3913');
@@ -86,10 +97,13 @@ onMounted(() => {
 
 // Watch items and update markers
 watch(() => props.items, (newItems) => {
-  Object.values(newItems).forEach(item => {
-    if (item._markers) {
-      item._markers.forEach(m => m.removeFrom(map.value));
+  const currentQids = new Set(Object.keys(newItems));
+  for (const [qid] of markerMap) {
+    if (!currentQids.has(qid)) {
+      removeMarkersForItem(qid);
     }
+  }
+  Object.values(newItems).forEach(item => {
     addMarkersToMap(item, map.value);
   });
 }, {deep: true});
