@@ -6,7 +6,6 @@ from collections import defaultdict
 from typing import Any
 
 import sqlalchemy
-from flask_login import UserMixin  # type: ignore
 from geoalchemy2 import Geometry
 from sqlalchemy import func
 from sqlalchemy.dialects import postgresql
@@ -618,7 +617,7 @@ class Polygon(MapMixin, Base):
         return area / (1000 * 1000)
 
 
-class User(Base, UserMixin):
+class User(Base):
     """User."""
 
     __tablename__ = "user"
@@ -643,6 +642,20 @@ class User(Base, UserMixin):
     osm_account_created = Column(DateTime)
     osm_oauth_token = Column(String)
     osm_oauth_token_secret = Column(String)
+
+    @property
+    def is_authenticated(self) -> bool:
+        """User is authenticated."""
+        return True
+
+    @property
+    def is_anonymous(self) -> bool:
+        """User is anonymous."""
+        return False
+
+    def get_id(self) -> str:
+        """Return user ID as string."""
+        return str(self.id)
 
     def is_active(self) -> bool:
         """User is active."""

@@ -4,7 +4,6 @@ import os.path
 import re
 import typing
 
-import flask
 import geoalchemy2
 import sqlalchemy
 from sqlalchemy import and_, or_
@@ -12,7 +11,8 @@ from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import Mapped
 from sqlalchemy.sql import select
 
-from matcher import database, model, wikidata, wikidata_api
+from matcher.config import config as app_config
+from matcher import context, database, model, wikidata, wikidata_api
 from matcher.planet import line, point, polygon
 
 TagsType = dict[str, str]
@@ -62,7 +62,7 @@ def get_country_iso3166_1(lat: float, lon: float) -> set[str]:
             continue
         alpha2_codes.add(alpha2)
 
-    flask.g.alpha2_codes = alpha2_codes
+    context.set("alpha2_codes", alpha2_codes)
     return alpha2_codes
 
 
@@ -574,7 +574,6 @@ def get_tag_filter(
 
 
 def get_preset_translations() -> dict[str, typing.Any]:
-    app = flask.current_app
     country_language = {
         "AU": "en-AU",  # Australia
         "GB": "en-GB",  # United Kingdom
@@ -582,10 +581,10 @@ def get_preset_translations() -> dict[str, typing.Any]:
         "IN": "en-IN",  # India
         "NZ": "en-NZ",  # New Zealand
     }
-    ts_dir = app.config["ID_TAGGING_SCHEMA_DIR"]
+    ts_dir = app_config["ID_TAGGING_SCHEMA_DIR"]
     translation_dir = os.path.join(ts_dir, "dist", "translations")
 
-    for code in flask.g.alpha2_codes:
+    for code in context.get("alpha2_codes") or ():
         lang_code = country_language.get("code")
         if not lang_code:
             continue
@@ -634,8 +633,7 @@ def get_presets_from_tags(ending: str, tags: TagsType) -> list[dict[str, typing.
 
 def find_preset_file(k: str, v: str, ending: str) -> dict[str, str] | None:
     """Find preset file."""
-    app = flask.current_app
-    ts_dir = app.config["ID_TAGGING_SCHEMA_DIR"]
+    ts_dir = app_config["ID_TAGGING_SCHEMA_DIR"]
     preset_dir = os.path.join(ts_dir, "data", "presets")
 
     filename = os.path.join(preset_dir, k, v + ".json")
@@ -679,7 +677,7 @@ def address_from_tags(tags: TagsType) -> str | None:
     if not all("addr:" + k in tags for k in keys):
         return None
 
-    if flask.g.street_number_first:
+    if context.get("street_number_first"):
         keys.reverse()
     return " ".join(tags["addr:" + k] for k in keys)
 
@@ -899,8 +897,6 @@ def find_osm_candidates(item, limit=80, max_distance=450, names=None):
 
         shape = "area" if table == "polygon" else table
 
-        item_identifier_tags = item.get_identifiers_tags()
-
         cur = {
             "identifier": f"{osm_type}/{osm_id}",
             "type": osm_type,
@@ -967,7 +963,7 @@ def get_item_street_addresses(item: model.Item) -> list[str]:
             number = q["datavalue"]["value"]
             address = (
                 f"{number} {street}"
-                if flask.g.street_number_first
+                if context.get("street_number_first")
                 else f"{street} {number}"
             )
             street_address.append(address)
@@ -976,7 +972,7 @@ def get_item_street_addresses(item: model.Item) -> list[str]:
 
 
 def check_is_street_number_first(latlng):
-    flask.g.street_number_first = is_street_number_first(*latlng)
+    context.set("street_number_first", is_street_number_first(*latlng))
 
 
 class ItemDetailType(typing.TypedDict, total=False):
@@ -1006,8 +1002,8 @@ def item_detail(item: model.Item) -> ItemDetailType:
     }
 
     locations = [list(i.get_lat_lon()) for i in item.locations]
-    if not hasattr(flask.g, "street_number_first"):
-        flask.g.street_number_first = is_street_number_first(*locations[0])
+    if not context.has("street_number_first"):
+        context.set("street_number_first", is_street_number_first(*locations[0]))
 
     image_filenames = item.get_claim("P18")
 
@@ -1107,7 +1103,7 @@ def wikidata_items(bounds, isa_filter=None):
 
 
 def missing_wikidata_items(qids, lat, lon):
-    flask.g.street_number_first = is_street_number_first(lat, lon)
+    context.set("street_number_first", is_street_number_first(lat, lon))
 
     db_items = []
     for qid in qids:

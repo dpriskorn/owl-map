@@ -7,15 +7,14 @@ import traceback
 from email.mime.text import MIMEText
 from email.utils import formatdate, make_msgid
 
-import flask
 import requests
-from flask import current_app, g, has_request_context, request
 
-from . import wikidata_api
+from matcher.config import config as app_config
+from matcher import wikidata_api
 
 
 def send_mail(
-    subject: str, body: str, config: flask.config.Config | None = None
+    subject: str, body: str, config: dict | None = None
 ) -> None:
     """Send an email to admins, catch and ignore exceptions."""
     try:
@@ -25,14 +24,13 @@ def send_mail(
 
 
 def send_mail_main(
-    subject: str, body: str, config: flask.config.Config | None = None
+    subject: str, body: str, config: dict | None = None
 ) -> None:
     """Send an email to admins."""
-    if config is None:
-        config = current_app.config
+    cfg = config if config is not None else app_config
 
-    mail_to = config["ADMIN_EMAIL"]
-    mail_from = config["MAIL_FROM"]
+    mail_to = cfg["ADMIN_EMAIL"]
+    mail_from = cfg["MAIL_FROM"]
     msg = MIMEText(body, "plain", "UTF-8")
 
     msg["Subject"] = subject
@@ -40,32 +38,22 @@ def send_mail_main(
     msg["From"] = mail_from
     msg["Date"] = formatdate()
     msg["Message-ID"] = make_msgid()
-    extra_mail_headers: list[tuple[str, str]] = config.get("MAIL_HEADERS", [])
+    extra_mail_headers: list[tuple[str, str]] = cfg.get("MAIL_HEADERS", [])
     for key, value in extra_mail_headers:
         assert key not in msg
         msg[key] = value
 
-    s = smtplib.SMTP(config["SMTP_HOST"])
+    s = smtplib.SMTP(cfg["SMTP_HOST"])
     s.sendmail(mail_from, [mail_to], msg.as_string())
     s.quit()
 
 
-def get_username() -> str:
-    """Get the username for the current user."""
-    user: str
-    if hasattr(g, "user"):
-        if g.user.is_authenticated:
-            user = g.user.username
-        else:
-            user = "not authenticated"
-    else:
-        user = "no user"
-
-    return user
-
-
 def error_mail(
-    subject: str, data: str, r: requests.Response, via_web: bool = True
+    subject: str,
+    data: str,
+    r: requests.Response,
+    user: str | None = None,
+    request_url: str | None = None,
 ) -> None:
     """Error mail."""
     body = f"""
@@ -82,20 +70,24 @@ reply:
 {r.text}
 """
 
-    if has_request_context():
-        body = f"site URL: {request.url}\nuser: {get_username()}\n" + body
+    if request_url:
+        body = f"site URL: {request_url}\nuser: {user or 'unknown'}\n" + body
 
     send_mail(subject, body)
 
 
-def open_changeset_error(session_id: int, changeset: str, r: requests.Response) -> None:
+def open_changeset_error(
+    session_id: int,
+    changeset: str,
+    r: requests.Response,
+    username: str | None = None,
+) -> None:
     """Send error mail when failing to open a changeset."""
-    username = g.user.username
     body = f"""
-user: {username}
+user: {username or 'unknown'}
 page: {r.url}
 
-message user: https://www.openstreetmap.org/message/new/{username}
+message user: https://www.openstreetmap.org/message/new/{username or 'unknown'}
 
 sent:
 
@@ -113,7 +105,7 @@ reply:
 def send_traceback(info, prefix="osm-wikidata"):
     exception_name = sys.exc_info()[0].__name__
     subject = f"{prefix} error: {exception_name}"
-    body = f"user: {get_username()}\n" + info + "\n" + traceback.format_exc()
+    body = info + "\n" + traceback.format_exc()
     send_mail(subject, body)
 
 

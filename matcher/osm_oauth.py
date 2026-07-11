@@ -1,56 +1,47 @@
 """OSM Authentication."""
 
-import json
 import typing
 from datetime import datetime
 from urllib.parse import urlencode
 
-import flask
 import lxml.etree
 import requests
-from requests_oauthlib import OAuth2Session
+from requests_oauthlib import OAuth1Session
 
-from . import user_agent_headers
-from .model import User
 
 osm_api_base = "https://api.openstreetmap.org/api/0.6"
-scope = ["read_prefs", "write_api"]
 
 
-def get_session() -> OAuth2Session:
-    """Get session."""
-    token = flask.session.get("oauth_token")
-    if not token:
-        user = flask.g.user
-        assert user.is_authenticated
-        token = json.loads(user.osm_oauth_token)
-        flask.session["oauth_token"] = token
-
-    callback = flask.url_for("oauth_callback", _external=True)
-    return OAuth2Session(
-        flask.current_app.config["CLIENT_KEY"],
-        redirect_uri=callback,
-        scope=scope,
-        token=token,
+def get_oauth_session(client_key: str, token: dict) -> OAuth1Session:
+    """Create an OAuth1Session from stored token dict."""
+    return OAuth1Session(
+        client_key,
+        resource_owner_key=token.get("oauth_token"),
+        resource_owner_secret=token.get("oauth_token_secret"),
     )
 
 
-def api_put_request(path: str, **kwargs: typing.Any) -> requests.Response:
+def api_put_request(
+    client_key: str, token: dict, path: str, **kwargs: typing.Any
+) -> requests.Response:
     """Send OSM API PUT request."""
-    oauth = get_session()
+    oauth = get_oauth_session(client_key, token)
+    from matcher import user_agent_headers
 
     return oauth.request(
         "PUT", osm_api_base + path, headers=user_agent_headers(), **kwargs
     )
 
 
-def api_request(path: str, **params: typing.Any) -> requests.Response:
+def api_request(
+    client_key: str, token: dict, path: str, **params: typing.Any
+) -> requests.Response:
     """Send OSM API request."""
     url = osm_api_base + path
     if params:
         url += "?" + urlencode(params)
 
-    oauth = get_session()
+    oauth = get_oauth_session(client_key, token)
     return oauth.get(url, timeout=4)
 
 
@@ -81,14 +72,3 @@ def parse_userinfo_call(xml: bytes) -> dict[str, typing.Any]:
         "description": user.findtext(".//description"),
         "img": (img.get("href") if img is not None else None),
     }
-
-
-def get_username() -> str | None:
-    """Get username of current user."""
-    if "user_id" not in flask.session:
-        return None  # not authorized
-
-    user_id = flask.session["user_id"]
-
-    user = User.query.get(user_id)
-    return typing.cast(str, user.username)

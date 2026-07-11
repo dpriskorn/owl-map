@@ -7,10 +7,11 @@ import re
 import typing
 from datetime import date
 from itertools import islice
-from typing import Any, cast
+from typing import Any
 
-import flask
 import user_agents
+
+from matcher.config import config as app_config
 from num2words import num2words
 
 metres_per_mile = 1609.344
@@ -56,8 +57,7 @@ def contains_digit(s: str) -> bool:
 
 def cache_dir() -> str:
     """Get cache dir location."""
-    d: str = flask.current_app.config["CACHE_DIR"]
-    return d
+    return app_config["CACHE_DIR"]
 
 
 def cache_filename(filename: str) -> str:
@@ -70,16 +70,18 @@ def load_from_cache(filename: str) -> Any:
     return json.load(open(cache_filename(filename)))
 
 
-def get_radius(default: int = 1000) -> int | None:
-    """Get radius request argument with default."""
-    arg_radius = flask.request.args.get("radius")
-    return int(arg_radius) if arg_radius and arg_radius.isdigit() else default
+def get_radius(radius_str: str | None = None, default: int = 1000) -> int:
+    """Parse radius from string or return default."""
+    if radius_str and radius_str.isdigit():
+        return int(radius_str)
+    return default
 
 
-def get_int_arg(name: str) -> int | None:
-    """Get an request arg and convert to integer."""
-    v = flask.request.args.get(name)
-    return int(v) if v and v.isdigit() else None
+def get_int_arg(value: str | None = None) -> int | None:
+    """Convert a string value to integer."""
+    if value and value.isdigit():
+        return int(value)
+    return None
 
 
 def calc_chunk_size(area_in_sq_km: float, size: int = 22) -> int:
@@ -93,15 +95,14 @@ def file_missing_or_empty(filename: str) -> bool:
     return os.path.exists(filename) or os.stat(filename).st_size == 0
 
 
-def is_bot() -> bool:
+def is_bot(user_agent: str | None = None) -> bool:
     """Is the current request from a web robot."""
-    ua = flask.request.headers.get("User-Agent")
-    return bool(ua and user_agents.parse(ua).is_bot)
+    return bool(user_agent and user_agents.parse(user_agent).is_bot)
 
 
 def log_location() -> str:
-    """Get log location from Flask config."""
-    return cast(str, flask.current_app.config["LOG_DIR"])
+    """Get log location from config."""
+    return app_config["LOG_DIR"]
 
 
 def capfirst(value: str) -> str:
@@ -114,9 +115,9 @@ def any_upper(value: str) -> bool:
     return any(c.isupper() for c in value)
 
 
-def get_free_space(config: flask.config.Config) -> int:
+def get_free_space(free_space_path: str) -> int:
     """Return the amount of available free space."""
-    s = os.statvfs(config["FREE_SPACE_PATH"])
+    s = os.statvfs(free_space_path)
     return s.f_bsize * s.f_bavail
 
 
