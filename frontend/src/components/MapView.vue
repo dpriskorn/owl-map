@@ -26,7 +26,7 @@ const props = defineProps({
   currentOsm: {type: Object, default: null},
 });
 
-const MIN_ZOOM = 17;
+const MIN_ZOOM = parseInt(import.meta.env.VITE_MIN_ZOOM || '13', 10);
 
 const emit = defineEmits(['item-click', 'bounds-change']);
 
@@ -49,8 +49,12 @@ const addMarkersToMap = (item, mapInstance) => {
   });
 };
 
+const DEFAULT_LAT = parseFloat(import.meta.env.VITE_DEFAULT_LAT || '62.3913');
+const DEFAULT_LON = parseFloat(import.meta.env.VITE_DEFAULT_LON || '17.3068');
+const DEFAULT_ZOOM = parseInt(import.meta.env.VITE_DEFAULT_ZOOM || '8', 10);
+
 onMounted(() => {
-  map.value = L.map('map').setView([52, 0], 8);
+  map.value = L.map('map').setView([DEFAULT_LAT, DEFAULT_LON], DEFAULT_ZOOM);
 
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© OpenStreetMap contributors',
@@ -59,6 +63,7 @@ onMounted(() => {
   map.value.on('moveend', () => {
     const bounds = map.value.getBounds();
     const zoom = map.value.getZoom();
+    console.debug('MapView bounds-change', {zoom});
     const boundsArray = [
       bounds.getSouthWest().lat,
       bounds.getSouthWest().lng,

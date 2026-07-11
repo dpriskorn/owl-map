@@ -2,28 +2,27 @@ wikidata_items_count: |
   PREFIX wdt: <http://www.wikidata.org/prop/direct/>
   PREFIX wd: <http://www.wikidata.org/entity/>
   PREFIX bd: <http://www.bigdata.com/rdf#>
-  SELECT (COUNT(DISTINCT ?item) AS ?count) WHERE {{
+  SELECT (COUNT(DISTINCT ?item) AS ?count) WHERE {
     ?item wdt:P625 ?coord .
-  }}
+  }
 
 wikidata_items: |
   PREFIX wdt: <http://www.wikidata.org/prop/direct/>
   PREFIX wd: <http://www.wikidata.org/entity/>
   PREFIX bd: <http://www.bigdata.com/rdf#>
-  PREFIX geo: <http://www.opengis.net/ont/geosparql#>
-  SELECT ?item (STR(?coord) AS ?coord_str) WHERE {{
+  SELECT ?item (STR(?coord) AS ?coord_str) WHERE {
     ?item wdt:P625 ?coord .
-  }}
+  }
   LIMIT 400
 
 wikidata_isa_counts: |
   PREFIX wdt: <http://www.wikidata.org/prop/direct/>
   PREFIX wd: <http://www.wikidata.org/entity/>
   PREFIX bd: <http://www.bigdata.com/rdf#>
-  SELECT ?type (COUNT(DISTINCT ?item) AS ?count) WHERE {{
+  SELECT ?type (COUNT(DISTINCT ?item) AS ?count) WHERE {
     ?item wdt:P31 ?type ;
           wdt:P625 ?coord .
-  }}
+  }
   GROUP BY ?type
   ORDER BY DESC(?count)
   LIMIT 100
@@ -32,6 +31,6 @@ get_item_coordinates: |
   PREFIX wdt: <http://www.wikidata.org/prop/direct/>
   PREFIX wd: <http://www.wikidata.org/entity/>
   PREFIX bd: <http://www.bigdata.com/rdf#>
-  SELECT ?coord WHERE {{
+  SELECT ?coord WHERE {
     wd:{qid} wdt:P625 ?coord .
   }}

@@ -117,6 +117,8 @@ import {useState} from './composables/useState.js';
 import {useApi} from './composables/useApi.js';
 import {useEdits} from './composables/useEdits.js';
 
+const MIN_ZOOM = parseInt(import.meta.env.VITE_MIN_ZOOM || '13', 10);
+
 const {
   state,
   visibleItems,
@@ -166,7 +168,8 @@ const handleItemClick = async (qid, marker) => {
 };
 
 const handleBoundsChange = async (bounds, boundsArray, zoom) => {
-  if (zoom < 17) {
+  console.debug('handleBoundsChange', {zoom, MIN_ZOOM});
+  if (zoom < MIN_ZOOM) {
     setAreaTooBig(true);
     setTooManyItems(false);
     setItems({});
