@@ -235,9 +235,12 @@ const handleBoundsChange = async (bounds, boundsArray, zoom) => {
         api.fetchIsaCounts(boundsArray),
       ]);
       const items = itemsResponse.data.items;
+      console.debug('handleBoundsChange items response', {items});
       const qids = Object.keys(items);
+      console.debug('handleBoundsChange qids', {qids});
       if (qids.length > 0) {
         const labels = await api.fetchWikidataDetails(qids);
+        console.debug('handleBoundsChange labels', {labels});
         for (const qid of qids) {
           if (labels[qid]) {
             items[qid].wikidata = items[qid].wikidata || {};
@@ -245,6 +248,7 @@ const handleBoundsChange = async (bounds, boundsArray, zoom) => {
           }
         }
       }
+      console.debug('handleBoundsChange final items', {items});
       setItems(items);
       setItemTypeHits(isaResponse.data.isa_count || []);
     } catch (err) {

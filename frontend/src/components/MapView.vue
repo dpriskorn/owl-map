@@ -34,9 +34,16 @@ const currentHit = ref(null);
 const markerMap = new Map();
 
 const addMarkersToMap = (item, mapInstance) => {
+  console.debug('addMarkersToMap called', {item, hasQid: !!item.qid, hasMarkers: !!item.markers, hasWikidataMarkers: !!item.wikidata?.markers});
   const markers = item.markers || item.wikidata?.markers;
-  if (!markers) return;
-  if (markerMap.has(item.qid)) return;
+  if (!markers) {
+    console.debug('addMarkersToMap: no markers found for item', {item});
+    return;
+  }
+  if (markerMap.has(item.qid)) {
+    console.debug('addMarkersToMap: already has markers for', {qid: item.qid});
+    return;
+  }
 
   const markersList = [];
   markers.forEach(markerData => {
@@ -96,7 +103,22 @@ onMounted(() => {
 });
 
 // Watch items and update markers
-watch(() => props.items, (newItems) => {
+watch(() => props.items, (newItems, oldItems) => {
+  console.debug('MapView items changed', {
+    newItems,
+    oldItems,
+    newKeys: Object.keys(newItems || {}),
+    oldKeys: Object.keys(oldItems || {}),
+    sameRef: newItems === oldItems
+  });
+  if (!map.value) {
+    console.debug('MapView map not ready yet');
+    return;
+  }
+  if (!newItems || Object.keys(newItems).length === 0) {
+    console.debug('MapView: no items to display');
+    return;
+  }
   const currentQids = new Set(Object.keys(newItems));
   for (const [qid] of markerMap) {
     if (!currentQids.has(qid)) {

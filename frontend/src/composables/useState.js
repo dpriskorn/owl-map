@@ -92,7 +92,7 @@ export function useState() {
 
   // Item actions
   const setItems = (itemsObj) => {
-    state.items = itemsObj;
+    state.items = {...itemsObj};
     state.item_count = Object.keys(itemsObj).length;
   };
 
