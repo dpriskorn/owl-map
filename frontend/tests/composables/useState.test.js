@@ -189,34 +189,21 @@ describe('useState', () => {
   });
 
   describe('visibleItems', () => {
-    it('filters items with wikidata', () => {
+    it('filters items with markers', () => {
       setItems({
-        Q1: {qid: 'Q1', wikidata: {label: 'Test'}},
-        Q2: {qid: 'Q2', wikidata: null},
+        Q1: {qid: 'Q1', markers: [{lat: 1, lon: 1}]},
+        Q2: {qid: 'Q2', markers: []},
       });
       expect(visibleItems.value.length).toBe(1);
       expect(visibleItems.value[0].qid).toBe('Q1');
     });
 
-    it('filters by linked/not_linked when set', () => {
-      state.linked = false;
-      state.not_linked = true;
+    it('shows all items with markers when no filters set', () => {
       setItems({
-        Q1: {qid: 'Q1', wikidata: {label: 'A'}, osm: {id: 1}},
-        Q2: {qid: 'Q2', wikidata: {label: 'B'}, osm: null},
+        Q1: {qid: 'Q1', markers: [{lat: 1, lon: 1}]},
+        Q2: {qid: 'Q2', markers: [{lat: 2, lon: 2}]},
       });
-      expect(visibleItems.value.length).toBe(1);
-      expect(visibleItems.value[0].qid).toBe('Q2');
-    });
-
-    it('filters by isa_ticked when set', () => {
-      state.isa_ticked = ['Q5'];
-      setItems({
-        Q1: {qid: 'Q1', wikidata: {isa_list: [{qid: 'Q5'}]}},
-        Q2: {qid: 'Q2', wikidata: {isa_list: [{qid: 'Q6'}]}},
-      });
-      expect(visibleItems.value.length).toBe(1);
-      expect(visibleItems.value[0].qid).toBe('Q1');
+      expect(visibleItems.value.length).toBe(2);
     });
   });
 

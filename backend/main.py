@@ -18,7 +18,7 @@ from matcher.config import config
 
 config.from_dict({
     "SECRET_KEY": os.getenv("SECRET_KEY", "dev-secret-key"),
-    "DB_URL": os.getenv("DATABASE_URL", "postgresql:///matcher"),
+    "DB_URL": os.getenv("DATABASE_URL", "postgresql:///osm"),
     "GEOLITE2": os.getenv("GEOLITE2"),
 })
 
@@ -62,7 +62,7 @@ async def app_exception_handler(request: Request, exc: AppException) -> JSONResp
 @app.on_event("startup")
 async def startup() -> None:
     """Initialize app on startup."""
-    database.init_db(config.get("DB_URL", "postgresql:///matcher"))
+    database.init_db(config.get("DB_URL", "postgresql:///osm"))
 
     geolite2_path = config.get("GEOLITE2")
     if geolite2_path:

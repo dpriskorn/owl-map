@@ -60,15 +60,7 @@ export function useState() {
 
   const visibleItems = computed(() => {
     return itemsList.value.filter(item => {
-      if (!item.wikidata) return false;
-      if (!state.linked && item.osm) return false;
-      if (!state.not_linked && !item.osm) return false;
-      if (state.isa_ticked.length) {
-        const hasMatchedIsa = item.wikidata.isa_list?.some(
-          isa => state.isa_ticked.includes(isa.qid)
-        );
-        if (!hasMatchedIsa) return false;
-      }
+      if (!item.markers || !item.markers.length) return false;
       return true;
     });
   });

@@ -1,6 +1,8 @@
 import axios from 'redaxios';
 
 const api_base_url = import.meta.env.VITE_API_URL || '';
+const wikidata_api_url = 'https://www.wikidata.org/w/rest.php/wikibase/v1';
+const user_agent = 'owl-map/1.0 (https://github.com/dpriskorn/owl-map)';
 
 export function useApi() {
   const api_call = async (path, options = {}) => {
@@ -15,71 +17,34 @@ export function useApi() {
     }
   };
 
-  const fetchItems = async (bbox, types = [], itemType = '') => {
-    const params = {
-      bbox: bbox.join(','),
-      types: types.join(','),
-      type: itemType,
-    };
+  const fetchItems = async (bbox) => {
+    const params = {bbox: bbox.join(',')};
     return api_call('items', {params});
   };
 
-  const fetchItemCount = async (bbox, types = [], itemType = '') => {
-    const params = {
-      bbox: bbox.join(','),
-      types: types.join(','),
-      type: itemType,
-    };
+  const fetchItemCount = async (bbox) => {
+    const params = {bbox: bbox.join(',')};
     return api_call('count', {params});
-  };
-
-  const fetchItemDetail = async (qid) => {
-    return api_call(`item/Q${qid}`);
-  };
-
-  const fetchItemTags = async (qid) => {
-    return api_call(`item/Q${qid}/tags`);
-  };
-
-  const fetchItemCandidates = async (qid, radius = 1000) => {
-    return api_call(`item/Q${qid}/candidates`, {params: {radius}});
   };
 
   const fetchIsaCounts = async (bbox) => {
     return api_call('isa', {params: {bbox: bbox.join(',')}});
   };
 
-  const fetchIsaSearch = async (query) => {
-    return api_call('isa_search', {params: {q: query}});
-  };
-
-  const fetchMissing = async (qids, lat, lon) => {
-    return api_call('missing', {params: {qids: qids.join(','), lat, lon}});
-  };
-
   const fetchLocation = async (ip) => {
     return api_call('location', {params: {ip}});
   };
 
-  const fetchOsmObjects = async (bbox, isaFilter = []) => {
-    return api_call('osm', {
-      params: {
-        bounds: bbox.join(','),
-        isa: isaFilter.join(','),
-      },
-    });
+  const fetchOsmObjects = async (bbox) => {
+    return api_call('osm', {params: {bounds: bbox.join(',')}});
   };
 
-  const fetchPlaceItems = async (osmType, osmId) => {
-    return api_call(`place/${osmType}/${osmId}`);
-  };
-
-  const fetchPolygon = async (osmType, osmId) => {
-    return api_call(`polygon/${osmType}/${osmId}`);
-  };
-
-  const search = async (query) => {
-    return api_call('search', {params: {q: query}});
+  const search = async (query, bbox = null) => {
+    const params = {q: query};
+    if (bbox) {
+      params.bbox = bbox.join(',');
+    }
+    return api_call('search', {params});
   };
 
   const createEditSession = async (comment, editList) => {
@@ -107,25 +72,38 @@ export function useApi() {
     }
   };
 
+  const fetchLabels = async (qids) => {
+    if (!qids || qids.length === 0) return {};
+    const results = {};
+    await Promise.all(
+      qids.map(async (qid) => {
+        try {
+          const response = await axios.get(
+            `${wikidata_api_url}/entities/items/${qid}/labels`,
+            {headers: {'User-Agent': user_agent}, timeout: 10000}
+          );
+          results[qid] = response.data;
+        } catch {
+          results[qid] = {};
+        }
+      })
+    );
+    return results;
+  };
+
   return {
     api_call,
     fetchItems,
     fetchItemCount,
-    fetchItemDetail,
-    fetchItemTags,
-    fetchItemCandidates,
     fetchIsaCounts,
-    fetchIsaSearch,
-    fetchMissing,
     fetchLocation,
     fetchOsmObjects,
-    fetchPlaceItems,
-    fetchPolygon,
     search,
     createEditSession,
     updateEditSession,
     getCommonsUrl,
     healthCheck,
+    fetchLabels,
     api_base_url,
   };
 }
