@@ -62,7 +62,7 @@
 </template>
 
 <script setup>
-import {computed} from 'vue';
+import {computed, ref, watch} from 'vue';
 
 const props = defineProps({
   isaTicked: {type: Array, default: () => []},
@@ -73,21 +73,38 @@ const props = defineProps({
 
 const emit = defineEmits(['toggle-isa', 'clear-all', 'update:search', 'clear-cache']);
 
+const selectedLabels = ref({});
+
+watch(() => props.searchResults, (newResults) => {
+  for (const item of newResults) {
+    const qid = item.id || item.qid;
+    if (item.label && item.label !== qid) {
+      selectedLabels.value[qid] = item.label;
+    }
+  }
+});
+
+watch(() => props.isaTicked, (newTicked, oldTicked) => {
+  for (const qid of newTicked) {
+    if (!oldTicked.includes(qid)) {
+      const fromSearch = props.searchResults.find(r => (r.id || r.qid) === qid);
+      if (fromSearch?.label) {
+        selectedLabels.value[qid] = fromSearch.label;
+      }
+    }
+  }
+}, {deep: true});
+
 const searchQuery = computed({
   get: () => props.searchQuery || '',
   set: (val) => emit('update:search', val),
 });
 
 const selectedItems = computed(() => {
-  const allItems = [...props.searchResults, ...props.itemTypeHits];
-  const unique = new Map();
-  for (const item of allItems) {
-    const qid = item.qid || item.id;
-    if (props.isaTicked.includes(qid) && !unique.has(qid)) {
-      unique.set(qid, {qid, label: item.label || item.qid || item.id});
-    }
-  }
-  return Array.from(unique.values());
+  return props.isaTicked.map(qid => ({
+    qid,
+    label: selectedLabels.value[qid] || qid,
+  }));
 });
 
 const displayHits = computed(() => {
