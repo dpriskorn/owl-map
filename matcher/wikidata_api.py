@@ -143,7 +143,13 @@ def get_items_near_coordinates(lat: float, lon: float, radius_km: float = 10) ->
 
     qids = []
     if "query" in data and "pages" in data["query"]:
-        for page in data["query"]["pages"].values():
-            if "title" in page and page["title"].startswith("Q"):
-                qids.append(page["title"])
+        pages = data["query"]["pages"]
+        if isinstance(pages, dict):
+            for page in pages.values():
+                if "title" in page and page["title"].startswith("Q"):
+                    qids.append(page["title"])
+        elif isinstance(pages, list):
+            for page in pages:
+                if "title" in page and page["title"].startswith("Q"):
+                    qids.append(page["title"])
     return qids
