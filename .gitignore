@@ -1,12 +1,6 @@
-venv
-__pycache__
-.mypy_cache/
-config/default.py
-.env
-*.egg-info
-dist
-build
-*.pyc
-.DS_Store
 node_modules/
-*.pbf
+dist/
+build/
+.env
+.DS_Store
+*.local

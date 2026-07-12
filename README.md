@@ -1,87 +1,40 @@
 # OWL Map
 
-Links Wikidata items to OpenStreetMap objects.
+Links Wikidata items to OpenStreetMap objects using SPARQL queries.
 
-## PostGIS Setup
+## Architecture
 
-OWL Map requires a PostgreSQL database with PostGIS and OSM data imported via osm2pgsql.
-
-### 1. Create Database
-
-```bash
-createdb osm
-psql -d osm -c "CREATE EXTENSION postgis;"
-```
-
-### 2. Download OSM Extract
-
-Download an OSM extract for your region of interest. Example using Sweden:
-
-```bash
-wget https://download.geofabrik.de/europe/sweden-latest.osm.pbf
-```
-
-For other regions, browse [Geofabrik's download site](https://download.geofabrik.de/).
-
-### 3. Import OSM Data
-
-The repository includes `style.lua` for osm2pgsql's flex output:
-
-```bash
-osm2pgsql \
-    --create \
-    --output flex \
-    --style style.lua \
-    --slim \
-    --database osm \
-    --cache 4000 \
-    --number-processes $(nproc) \
-    sweden-latest.osm.pbf
-```
-
-Adjust `--cache` and `--number-processes` based on your system's RAM and CPU cores.
-
-### 4. Set Database URL
-
-```bash
-export DATABASE_URL="postgresql:///osm"
-```
+Frontend-only SPA that queries:
+- **Wikidata API** - Search and nearcoord for finding items
+- **Qlever (Wikidata)** - Coordinate and type queries
+- **Qlever (OSM)** - OSM object queries
 
 ## Quick Start
-
-### Backend
-
-```bash
-poetry install
-just api
-```
-
-API runs on port 8080.
-
-### Frontend
 
 ```bash
 cd frontend
 npm install
-just vite
+npm run dev
 ```
 
-Frontend runs on port 3000 with proxy to API on 8080.
-
-### Tests
-
-```bash
-just test-all
-```
-
-Runs both backend (pytest) and frontend (vitest) tests.
+Frontend runs on port 3000.
 
 ## Configuration
 
-Environment variables:
+Environment variables in `.env`:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `DATABASE_URL` | `postgresql:///matcher` | PostgreSQL connection string |
-| `SECRET_KEY` | `dev-secret-key` | Session secret key |
-| `GEOLITE2` | (none) | Path to GeoLite2 database for IP geolocation |
+| `VITE_DEFAULT_LAT` | `62.3913` | Default map center latitude |
+| `VITE_DEFAULT_LON` | `17.3068` | Default map center longitude |
+| `VITE_DEFAULT_ZOOM` | `8` | Default zoom level |
+| `VITE_MIN_ZOOM` | `13` | Minimum zoom for item search |
+
+## Development
+
+```bash
+npm run dev     # Start dev server
+npm run build   # Production build
+npm run lint    # Run ESLint
+npm run test    # Run tests
+```

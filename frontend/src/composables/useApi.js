@@ -1,227 +1,154 @@
-import axios from 'redaxios';
+import {
+  searchEntities as wikidataSearchEntities,
+  getNearbyQids,
+  getLabels as wikidataGetLabels,
+  clearCache as clearWikidataCache,
+} from '../services/wikidataApi.js';
 
-const api_base_url = import.meta.env.VITE_API_URL || '';
-const wikidata_api_url = 'https://www.wikidata.org/w/rest.php/wikibase/v1';
-const user_agent = 'owl-map/1.0 (https://github.com/dpriskorn/owl-map)';
+import {
+  getItemsByQids,
+  getP1282,
+  getOsmObjectsByTag,
+  getNearbyOsmObjects,
+  parseOsmTag,
+  clearCache as clearQleverCache,
+} from '../services/qleverApi.js';
+
+import {
+  matchWikidataToOsm,
+  enrichItemsWithMatchStatus,
+} from '../services/matcher.js';
 
 export function useApi() {
-  const api_call = async (path, options = {}) => {
-    const url = `${api_base_url}/api/1/${path}`;
-    console.debug('api_call starting', {url, path, hasSignal: !!options.signal});
-    try {
-      const response = await axios({url, ...options});
-      console.debug('api_call completed', {url, status: response.status});
-      return response;
-    } catch (error) {
-      console.error('api_call failed', {url, err: error.message, status: error.response?.status});
-      const api_call_error_message = error.response?.data?.error || error.message;
-      const api_call_error_traceback = error.response?.data?.traceback;
-      throw {api_call_error_message, api_call_error_traceback};
-    }
-  };
-
   let itemsAbort = null;
 
-  const fetchItems = async (bbox, isaTypes = null) => {
+  const fetchItems = async (bbox, isaType = null) => {
     if (itemsAbort) {
       console.debug('fetchItems: aborting previous request');
       itemsAbort.abort();
     }
     itemsAbort = new AbortController();
-    const params = {bbox: bbox.join(',')};
-    if (isaTypes && isaTypes.length > 0) {
-      params.isa = isaTypes.join(',');
-    }
-    console.debug('fetchItems: making request', {params});
+
     try {
-      const result = await api_call('items', {params, signal: itemsAbort.signal});
-      console.debug('fetchItems: got result', {itemCount: Object.keys(result.data.items || {}).length});
-      return result;
-    } catch (err) {
-      if (axios.isCancel(err) || err.name === 'CanceledError') {
-        console.debug('fetchItems: request was cancelled');
-        return {data: {items: {}}};
+      const [latMin, lonMin, latMax, lonMax] = bbox;
+      const centerLat = (latMin + latMax) / 2;
+      const centerLon = (lonMin + lonMax) / 2;
+
+      const latRangeKm = (latMax - latMin) * 111.0;
+      const lonRangeKm = (lonMax - lonMin) * 111.0 * Math.cos(Math.radians(centerLat));
+      const radiusKm = Math.sqrt(latRangeKm ** 2 + lonRangeKm ** 2) / 2 + 1;
+      const effectiveRadius = Math.max(radiusKm, 5);
+
+      console.debug('fetchItems: finding nearby QIDs', {centerLat, centerLon, radiusKm: effectiveRadius});
+      const qids = await getNearbyQids(centerLat, centerLon, effectiveRadius);
+      console.debug('fetchItems: got QIDs', {count: qids.length});
+
+      if (qids.length === 0) {
+        return {data: {items: {}, osm_objects: {}, warnings: []}};
       }
-      console.error('fetchItems: request failed', {err});
-      throw err;
+
+      console.debug('fetchItems: fetching Wikidata items', {isaType, qidCount: qids.length});
+      const wikidataResult = await getItemsByQids(qids, isaType);
+      let items = wikidataResult.items;
+
+      const filteredItems = {};
+      for (const [qid, item] of Object.entries(items)) {
+        const validMarkers = item.markers.filter(m =>
+          latMin <= m.lat && m.lat <= latMax &&
+          lonMin <= m.lon && m.lon <= lonMax
+        );
+        if (validMarkers.length > 0) {
+          filteredItems[qid] = {...item, markers: validMarkers};
+        }
+      }
+      items = filteredItems;
+
+      console.debug('fetchItems: Wikidata items after bbox filter', {count: Object.keys(items).length});
+
+      const warnings = [];
+      let osmObjects = {};
+      let osmTagInfo = null;
+
+      if (isaType) {
+        const p1282Value = await getP1282(isaType);
+        if (p1282Value) {
+          osmTagInfo = parseOsmTag(p1282Value);
+          if (osmTagInfo) {
+            console.debug('fetchItems: querying OSM for', osmTagInfo);
+            osmObjects = await getOsmObjectsByTag(osmTagInfo.key, osmTagInfo.value, bbox);
+            console.debug('fetchItems: OSM objects found', {count: Object.keys(osmObjects).length});
+          }
+        } else {
+          warnings.push({
+            type: 'no_p1282',
+            message: `ISA type ${isaType} has no P1282 OSM tag`,
+            url: `https://www.wikidata.org/wiki/${isaType}`,
+          });
+        }
+      }
+
+      const matchResult = matchWikidataToOsm(items, osmObjects);
+      const enrichedItems = enrichItemsWithMatchStatus(items, matchResult);
+
+      console.debug('fetchItems: results', {
+        wikidata: Object.keys(enrichedItems).length,
+        osm: Object.keys(osmObjects).length,
+        matched: matchResult.matched.length,
+        wikidata_only: matchResult.wikidata_only.length,
+        osm_only: matchResult.osm_only.length,
+      });
+
+      return {
+        data: {
+          items: enrichedItems,
+          osm_objects: osmObjects,
+          warnings,
+        },
+      };
+    } catch (error) {
+      console.error('fetchItems error:', error);
+      throw error;
     }
   };
 
-  const fetchItemCount = async (bbox) => {
-    const params = {bbox: bbox.join(',')};
-    return api_call('count', {params});
-  };
-
-  let isaAbort = null;
-
-  const fetchIsaCounts = async (bbox) => {
-    if (isaAbort) isaAbort.abort();
-    isaAbort = new AbortController();
+  const fetchNearbyOsmObjects = async (osmTagKey, osmTagValue, lat, lon, limit = 10) => {
     try {
-      return await api_call('isa', {params: {bbox: bbox.join(',')}, signal: isaAbort.signal});
-    } catch (err) {
-      if (axios.isCancel(err) || err.name === 'CanceledError') return {data: {isa_count: []}};
-      throw err;
+      return await getNearbyOsmObjects(osmTagKey, osmTagValue, lat, lon, limit);
+    } catch (error) {
+      console.error('fetchNearbyOsmObjects error:', error);
+      throw error;
     }
   };
 
-  const fetchLocation = async (ip) => {
-    return api_call('location', {params: {ip}});
-  };
-
-  const fetchOsmObjects = async (bbox) => {
-    return api_call('osm', {params: {bounds: bbox.join(',')}});
-  };
-
-  const search = async (query, bbox = null) => {
-    const params = {q: query};
-    if (bbox) {
-      params.bbox = bbox.join(',');
-    }
-    return api_call('search', {params});
-  };
-
-  const createEditSession = async (comment, editList) => {
-    return api_call('edit', {
-      method: 'POST',
-      data: {comment, edit_list: editList},
-    });
-  };
-
-  const updateEditSession = async (sessionId, editList) => {
-    return api_call(`edit/${sessionId}`, {
-      method: 'POST',
-      data: {edit_list: editList},
-    });
-  };
-
-  const getCommonsUrl = (filename) => `${api_base_url}/commons/${filename}`;
-
-  const healthCheck = async () => {
+  const searchWikidata = async (query, language = null) => {
     try {
-      const response = await axios.get(`${api_base_url}/health`);
-      return response.data?.status === 'ok';
-    } catch {
-      return false;
+      const lang = language || navigator.language?.split('-')[0] || 'en';
+      return await wikidataSearchEntities(query, lang);
+    } catch (error) {
+      console.error('searchWikidata error:', error);
+      throw error;
     }
-  };
-
-  const getBrowserLanguage = () => {
-    const lang = navigator.language || navigator.userLanguage || 'en';
-    return lang.split('-')[0];
   };
 
   const fetchLabels = async (qids, language = null) => {
-    if (!qids || qids.length === 0) return {};
-    const lang = language || getBrowserLanguage();
-    const results = {};
-    await Promise.all(
-      qids.map(async (qid) => {
-        try {
-          const response = await axios.get(
-            `${wikidata_api_url}/entities/items/${qid}/labels`,
-            {headers: {'User-Agent': user_agent}, params: {language: lang}, timeout: 10000}
-          );
-          results[qid] = response.data;
-        } catch {
-          results[qid] = {};
-        }
-      })
-    );
-    return results;
-  };
-
-  const wikidataCache = new Map();
-
-  const fetchWikidataDetails = async (qids, language = null) => {
-    if (!qids || qids.length === 0) return {};
-    const lang = language || getBrowserLanguage();
-    const results = {};
-    const uncached = [];
-
-    for (const qid of qids) {
-      const cacheKey = `${qid}:${lang}`;
-      if (wikidataCache.has(cacheKey)) {
-        results[qid] = wikidataCache.get(cacheKey);
-      } else {
-        uncached.push(qid);
-      }
-    }
-
-    if (uncached.length > 0) {
-      await Promise.all(
-        uncached.map(async (qid) => {
-          const cacheKey = `${qid}:${lang}`;
-          try {
-            const [labelRes, descRes] = await Promise.all([
-              axios.get(
-                `${wikidata_api_url}/entities/items/${qid}/labels/${lang}`,
-                {headers: {'User-Agent': user_agent}, timeout: 10000}
-              ),
-              axios.get(
-                `${wikidata_api_url}/entities/items/${qid}/descriptions/${lang}`,
-                {headers: {'User-Agent': user_agent}, timeout: 10000}
-              ).catch(() => ({data: null})),
-            ]);
-            const result = {
-              label: labelRes.data || qid,
-              description: descRes.data || null,
-            };
-            wikidataCache.set(cacheKey, result);
-            results[qid] = result;
-          } catch {
-            const result = {label: qid, description: null};
-            wikidataCache.set(cacheKey, result);
-            results[qid] = result;
-          }
-        })
-      );
-    }
-    return results;
-  };
-
-  const clearWikidataCache = () => {
-    wikidataCache.clear();
-  };
-
-  let wikidataSearchAbort = null;
-
-  const searchWikidata = async (query, language = null) => {
-    if (!query || query.length < 3) return [];
-    const lang = language || getBrowserLanguage();
-    if (wikidataSearchAbort) {
-      wikidataSearchAbort.abort();
-    }
-    wikidataSearchAbort = new AbortController();
     try {
-      const response = await axios.get(`${api_base_url}/api/1/wikidata_search`, {
-        params: {q: query, language: lang},
-        timeout: 10000,
-        signal: wikidataSearchAbort.signal,
-      });
-      return response.data.results || [];
-    } catch (err) {
-      if (axios.isCancel(err) || err.name === 'CanceledError') return [];
-      return [];
+      return await wikidataGetLabels(qids, language);
+    } catch (error) {
+      console.error('fetchLabels error:', error);
+      throw error;
     }
+  };
+
+  const clearAllCaches = () => {
+    clearWikidataCache();
+    clearQleverCache();
   };
 
   return {
-    api_call,
     fetchItems,
-    fetchItemCount,
-    fetchIsaCounts,
-    fetchLocation,
-    fetchOsmObjects,
-    search,
-    createEditSession,
-    updateEditSession,
-    getCommonsUrl,
-    healthCheck,
-    fetchLabels,
-    fetchWikidataDetails,
-    clearWikidataCache,
+    fetchNearbyOsmObjects,
     searchWikidata,
-    api_base_url,
+    fetchLabels,
+    clearAllCaches,
   };
 }

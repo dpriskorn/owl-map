@@ -1,27 +1,17 @@
-# OWL Map - FastAPI + Vue/Vite
+default:
+  @just --list
 
-api:
-    poetry run uvicorn backend.main:app --reload --port 8080
+dev:
+  cd frontend && npm run dev
 
-vite:
-    cd frontend && npx vite --port 3000
+test:
+  cd frontend && npm run test
 
-be-lint:
-    poetry run ruff check backend/ matcher/
+lint:
+  cd frontend && npm run lint
 
-be-file-len:
-    @find backend/ matcher/ -name "*.py" -exec wc -l {} \; | awk '$$1 > 700 {print}'
+build:
+  cd frontend && npm run build
 
-be-test:
-    poetry run pytest tests/
-
-fe-lint:
-    cd frontend && npx eslint src/ --ext .vue,.js
-
-fe-file-len:
-    cd frontend && npx eslint src/ --ext .vue,.js
-
-fe-test:
-    cd frontend && npx vitest run
-
-test-all: be-test fe-test
+preview:
+  cd frontend && npm run preview

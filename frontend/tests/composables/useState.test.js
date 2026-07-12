@@ -2,18 +2,17 @@ import {describe, it, expect, beforeEach} from 'vitest';
 import {useState} from '../../src/composables/useState.js';
 
 describe('useState', () => {
-  let state, visibleItems, itemsList, itemCount, uploadsGroupedByQid;
+  let state, visibleItems, itemCount;
   let setItems, openItem, closeItem, setWikidataDetail, setLoading, setError;
-  let clearError, setUploadState, resetUpload, setHits, setCurrentHit;
-  let toggleIsa, clearIsaFilters, addEdit, clearEdits;
+  let clearError, setHits, setCurrentHit;
+  let toggleItemType, clearItemTypeFilters;
+  let setOsmObjects, setP1282Warning, clearP1282Warning;
 
   beforeEach(() => {
     const result = useState();
     state = result.state;
     visibleItems = result.visibleItems;
-    itemsList = result.itemsList;
     itemCount = result.itemCount;
-    uploadsGroupedByQid = result.uploadsGroupedByQid;
     setItems = result.setItems;
     openItem = result.openItem;
     closeItem = result.closeItem;
@@ -21,14 +20,13 @@ describe('useState', () => {
     setLoading = result.setLoading;
     setError = result.setError;
     clearError = result.clearError;
-    setUploadState = result.setUploadState;
-    resetUpload = result.resetUpload;
     setHits = result.setHits;
     setCurrentHit = result.setCurrentHit;
-    toggleIsa = result.toggleIsa;
-    clearIsaFilters = result.clearIsaFilters;
-    addEdit = result.addEdit;
-    clearEdits = result.clearEdits;
+    toggleItemType = result.toggleItemType;
+    clearItemTypeFilters = result.clearItemTypeFilters;
+    setOsmObjects = result.setOsmObjects;
+    setP1282Warning = result.setP1282Warning;
+    clearP1282Warning = result.clearP1282Warning;
   });
 
   describe('state initial values', () => {
@@ -36,19 +34,37 @@ describe('useState', () => {
       expect(state.loading).toBe(false);
       expect(state.items).toEqual({});
       expect(state.current_item).toBe(null);
-      expect(state.edits).toEqual([]);
-      expect(state.upload_state).toBe(undefined);
       expect(state.hits).toEqual([]);
-      expect(state.isa_ticked).toEqual([]);
+      expect(state.item_type_ticked).toEqual([]);
+      expect(state.error).toBe(null);
+      expect(state.osm_objects).toEqual({});
+      expect(state.p1282_warning).toBe(null);
     });
   });
 
   describe('setItems', () => {
-    it('sets items and updates item_count', () => {
+    it('sets items', () => {
       const items = {Q1: {qid: 'Q1', label: 'Test'}, Q2: {qid: 'Q2', label: 'Test2'}};
       setItems(items);
       expect(state.items).toEqual(items);
-      expect(state.item_count).toBe(2);
+    });
+  });
+
+  describe('setOsmObjects', () => {
+    it('sets OSM objects', () => {
+      const osmObjects = {'node/1': {osm_id: 'node/1', markers: [{lat: 1, lon: 1}]}};
+      setOsmObjects(osmObjects);
+      expect(state.osm_objects).toEqual(osmObjects);
+    });
+  });
+
+  describe('setP1282Warning / clearP1282Warning', () => {
+    it('sets and clears P1282 warning', () => {
+      const warning = {type: 'no_p1282', message: 'No P1282', url: 'https://wikidata.org'};
+      setP1282Warning(warning);
+      expect(state.p1282_warning).toEqual(warning);
+      clearP1282Warning();
+      expect(state.p1282_warning).toBe(null);
     });
   });
 
@@ -96,37 +112,15 @@ describe('useState', () => {
   });
 
   describe('setError / clearError', () => {
-    it('sets error message and traceback', () => {
-      setError('Something went wrong', 'traceback here');
-      expect(state.api_call_error_message).toBe('Something went wrong');
-      expect(state.api_call_error_traceback).toBe('traceback here');
+    it('sets error message', () => {
+      setError('Something went wrong');
+      expect(state.error).toBe('Something went wrong');
     });
 
     it('clears error', () => {
       setError('Error');
       clearError();
-      expect(state.api_call_error_message).toBe(null);
-      expect(state.api_call_error_traceback).toBe(null);
-    });
-  });
-
-  describe('setUploadState / resetUpload', () => {
-    it('sets upload state', () => {
-      setUploadState('uploading', {upload_progress: 50});
-      expect(state.upload_state).toBe('uploading');
-      expect(state.upload_progress).toBe(50);
-    });
-
-    it('resets upload state', () => {
-      state.upload_state = 'uploading';
-      state.upload_progress = 75;
-      state.upload_error = 'some error';
-      state.changeset_id = 123;
-      resetUpload();
-      expect(state.upload_state).toBe(undefined);
-      expect(state.upload_progress).toBe(0);
-      expect(state.upload_error).toBe(null);
-      expect(state.changeset_id).toBe(null);
+      expect(state.error).toBe(null);
     });
   });
 
@@ -144,47 +138,28 @@ describe('useState', () => {
     });
   });
 
-  describe('toggleIsa / clearIsaFilters', () => {
-    it('adds isa filter when not present', () => {
-      toggleIsa('Q1');
-      expect(state.isa_ticked).toContain('Q1');
+  describe('toggleItemType / clearItemTypeFilters', () => {
+    it('replaces item_type filter when not present (single select)', () => {
+      toggleItemType('Q1');
+      expect(state.item_type_ticked).toEqual(['Q1']);
     });
 
-    it('removes isa filter when already present', () => {
-      state.isa_ticked = ['Q1', 'Q2'];
-      toggleIsa('Q1');
-      expect(state.isa_ticked).toEqual(['Q2']);
+    it('clears item_type filter when same one is clicked', () => {
+      state.item_type_ticked = ['Q1'];
+      toggleItemType('Q1');
+      expect(state.item_type_ticked).toEqual([]);
     });
 
-    it('clears all isa filters', () => {
-      state.isa_ticked = ['Q1', 'Q2'];
-      clearIsaFilters();
-      expect(state.isa_ticked).toEqual([]);
-    });
-  });
-
-  describe('addEdit / clearEdits', () => {
-    it('adds a new edit', () => {
-      const item = {qid: 'Q1'};
-      const osm = {identifier: 'node/1'};
-      addEdit(item, osm);
-      expect(state.edits.length).toBe(1);
-      expect(state.edits[0].item).toStrictEqual(item);
-      expect(state.edits[0].osm).toStrictEqual(osm);
+    it('replaces item_type filter when different one is clicked', () => {
+      state.item_type_ticked = ['Q1'];
+      toggleItemType('Q2');
+      expect(state.item_type_ticked).toEqual(['Q2']);
     });
 
-    it('removes existing edit (toggle)', () => {
-      const item = {qid: 'Q1'};
-      const osm = {identifier: 'node/1'};
-      addEdit(item, osm);
-      addEdit(item, osm);
-      expect(state.edits.length).toBe(0);
-    });
-
-    it('clears all edits', () => {
-      state.edits = [{item: {qid: 'Q1'}, osm: {identifier: 'node/1'}}];
-      clearEdits();
-      expect(state.edits).toEqual([]);
+    it('clears all item_type filters', () => {
+      state.item_type_ticked = ['Q1', 'Q2'];
+      clearItemTypeFilters();
+      expect(state.item_type_ticked).toEqual([]);
     });
   });
 
@@ -198,28 +173,12 @@ describe('useState', () => {
       expect(visibleItems.value[0].qid).toBe('Q1');
     });
 
-    it('shows all items with markers when no filters set', () => {
+    it('shows all items with markers', () => {
       setItems({
         Q1: {qid: 'Q1', markers: [{lat: 1, lon: 1}]},
         Q2: {qid: 'Q2', markers: [{lat: 2, lon: 2}]},
       });
       expect(visibleItems.value.length).toBe(2);
-    });
-  });
-
-  describe('uploadsGroupedByQid', () => {
-    it('groups edits by qid', () => {
-      state.edits = [
-        {item: {qid: 'Q1', wikidata: {label: 'Item1'}}, osm: {identifier: 'node/1'}},
-        {item: {qid: 'Q1', wikidata: {label: 'Item1'}}, osm: {identifier: 'node/2'}},
-        {item: {qid: 'Q2', wikidata: {label: 'Item2'}}, osm: {identifier: 'way/1'}},
-      ];
-      const grouped = uploadsGroupedByQid.value;
-      expect(grouped.length).toBe(2);
-      expect(grouped[0].qid).toBe('Q1');
-      expect(grouped[0].osm.length).toBe(2);
-      expect(grouped[1].qid).toBe('Q2');
-      expect(grouped[1].osm.length).toBe(1);
     });
   });
 });

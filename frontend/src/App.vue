@@ -1,10 +1,5 @@
 <template>
   <div id="app" class="d-flex flex-column vh-100">
-    <div class="alert alert-danger alert-map" role="alert" v-if="!backendUp">
-      <i class="fa fa-exclamation-triangle"></i>
-      Backend is not available. Please ensure the API server is running on port 8080.
-    </div>
-
     <div class="alert alert-info alert-map" role="alert" v-if="state.loading">
       <span class="spinner-border spinner-border-sm me-2"></span>
       Loading Wikidata items...
@@ -21,6 +16,11 @@
     <div class="alert alert-primary alert-map" role="alert" v-if="!state.area_too_big && state.too_many_items">
       Found {{ state.item_count.toLocaleString() }} Wikidata items.<br/>
       Zoom in to see them.
+    </div>
+
+    <div class="alert alert-danger alert-map" role="alert" v-if="state.error">
+      <i class="fa fa-exclamation-triangle"></i>
+      {{ state.error }}
     </div>
 
     <div class="d-flex flex-grow-1 overflow-hidden">
@@ -41,26 +41,11 @@
       />
 
       <AppSidebar class="w-25 min-width-300">
-        <template v-if="state.view_edits">
-          <EditPanel
-            :edits="state.edits"
-            :uploads-grouped-by-qid="uploadsGroupedByQid"
-            :upload-state="state.upload_state"
-            :upload-progress="state.upload_progress"
-            :upload-error="state.upload_error"
-            :changeset-comment="state.changeset_comment"
-            :mock-upload="!state.user"
-            @close="closeEditList"
-            @upload="handleUpload"
-          />
-        </template>
-
-        <template v-else-if="state.current_item">
+        <template v-if="state.current_item">
           <ItemDetail
             :item="state.current_item"
             :wd-item="state.wd_item"
             @close="closeItem"
-            @toggle-osm="handleToggleOsm"
             @zoom-marker="handleZoomMarker"
           />
         </template>
@@ -76,14 +61,14 @@
 
           <ItemTypeFilter
             v-if="state.show_item_type_filter"
-            :isa-ticked="state.isa_ticked"
+            :isa-ticked="state.item_type_ticked"
             :item-type-hits="state.item_type_hits"
             :search-results="state.wikidata_search_results"
             :search-query="state.item_type_search"
-            @toggle-isa="handleToggleIsa"
-            @clear-all="clearIsaFilters"
+            @toggle-isa="handleToggleItemType"
+            @clear-all="clearItemTypeFilters"
             @update:search="state.item_type_search = $event"
-            @clear-cache="api.clearWikidataCache()"
+            @clear-cache="api.clearAllCaches()"
           />
 
           <ItemList
@@ -97,34 +82,16 @@
       </AppSidebar>
     </div>
 
-    <div v-if="state.edits.length && !state.view_edits" id="edit-count" class="p-2">
-      <span>edits: {{ state.edits.length }}</span>
-      <button class="btn btn-primary btn-sm ms-2" @click="state.view_edits = true">
-        <i class="fa fa-upload"></i> save
-      </button>
-    </div>
-
-    <ErrorModal
-      :message="state.api_call_error_message"
-      :traceback="state.api_call_error_traceback"
-    />
-
     <P1282WarningModal
       v-if="state.p1282_warning"
       :warning="state.p1282_warning"
       @dismiss="clearP1282Warning"
     />
-
-    <ImageModal
-      v-if="state.current_item"
-      :item="state.current_item"
-      :wd-item="state.wd_item"
-    />
   </div>
 </template>
 
 <script setup>
-import {ref, watch, onMounted, onUnmounted} from 'vue';
+import {ref, watch} from 'vue';
 import {useRoute} from 'vue-router';
 import MapView from './components/MapView.vue';
 import AppSidebar from './components/AppSidebar.vue';
@@ -132,14 +99,10 @@ import SearchPanel from './components/SearchPanel.vue';
 import ItemList from './components/ItemList.vue';
 import ItemDetail from './components/ItemDetail.vue';
 import ItemTypeFilter from './components/ItemTypeFilter.vue';
-import EditPanel from './components/EditPanel.vue';
-import ErrorModal from './components/ErrorModal.vue';
-import ImageModal from './components/ImageModal.vue';
 import P1282WarningModal from './components/P1282WarningModal.vue';
 
 import {useState} from './composables/useState.js';
 import {useApi} from './composables/useApi.js';
-import {useEdits} from './composables/useEdits.js';
 
 const MIN_ZOOM = parseInt(import.meta.env.VITE_MIN_ZOOM || '13', 10);
 
@@ -148,34 +111,29 @@ const route = useRoute();
 const {
   state,
   visibleItems,
-  uploadsGroupedByQid,
   openItem,
   closeItem,
-  clearEdits,
   setItems,
   setOsmObjects,
   setLoading,
   setAreaTooBig,
   setTooManyItems,
   setError,
-  setUploadState,
-  resetUpload,
   setHits,
   setCurrentHit,
   setWikidataDetail,
-  setItemTypeHits,
   setWikidataSearchResults,
-  toggleIsa,
-  clearIsaFilters,
+  toggleItemType,
+  clearItemTypeFilters,
   setP1282Warning,
   clearP1282Warning,
 } = useState();
 
 const api = useApi();
-const {toggleEdit, buildEditList, handleUploadEvent} = useEdits();
 
-const backendUp = ref(true);
-let healthCheckInterval = null;
+if (route.query.item_type) {
+  state.item_type_ticked = [route.query.item_type];
+}
 
 const mapPosition = ref({
   lat: parseFloat(route.params.lat) || parseFloat(import.meta.env.VITE_DEFAULT_LAT || '62.3913'),
@@ -185,9 +143,13 @@ const mapPosition = ref({
 
 const updateUrl = () => {
   const {lat, lon, zoom} = mapPosition.value;
-  const newPath = `/map/${zoom}/${lat.toFixed(6)}/${lon.toFixed(6)}`;
-  if (window.location.pathname !== newPath) {
-    window.history.replaceState(null, '', newPath);
+  const itemType = state.item_type_ticked.length > 0 ? state.item_type_ticked[0] : null;
+  let newUrl = `/map/${zoom}/${lat.toFixed(6)}/${lon.toFixed(6)}`;
+  if (itemType) {
+    newUrl += `?item_type=${itemType}`;
+  }
+  if (window.location.pathname + window.location.search !== newUrl) {
+    window.history.replaceState(null, '', newUrl);
   }
 };
 
@@ -196,40 +158,27 @@ const handlePositionChange = ({lat, lon, zoom}) => {
   updateUrl();
 };
 
-// Debounce helper
 let searchTimeout = null;
-
-const checkBackendHealth = async () => {
-  backendUp.value = await api.healthCheck();
-};
-
-const startHealthCheck = () => {
-  checkBackendHealth();
-  healthCheckInterval = setInterval(checkBackendHealth, 30000);
-};
-
-const stopHealthCheck = () => {
-  if (healthCheckInterval) {
-    clearInterval(healthCheckInterval);
-    healthCheckInterval = null;
-  }
-};
 
 const debounceSearch = async (query) => {
   if (searchTimeout) clearTimeout(searchTimeout);
   searchTimeout = setTimeout(async () => {
     if (query && query.length >= 3) {
-      const qidResults = await api.searchWikidata(query);
-      if (qidResults.length > 0) {
-        const qids = qidResults.map(r => r.id);
-        const details = await api.fetchWikidataDetails(qids);
-        const enriched = qidResults.map(r => ({
-          id: r.id,
-          label: details[r.id]?.label || r.id,
-          description: details[r.id]?.description || null,
-        }));
-        setWikidataSearchResults(enriched);
-      } else {
+      try {
+        const results = await api.searchWikidata(query);
+        if (results.length > 0) {
+          const enriched = results.map(r => ({
+            id: r.id,
+            label: r.label || r.id,
+            description: r.description || null,
+          }));
+          setWikidataSearchResults(enriched);
+        } else {
+          setWikidataSearchResults([]);
+        }
+      } catch (err) {
+        console.error('Search error:', err);
+        setError(err.message);
         setWikidataSearchResults([]);
       }
     } else {
@@ -242,14 +191,17 @@ watch(() => state.item_type_search, (newQuery) => {
   debounceSearch(newQuery);
 });
 
-// Map event handlers
 const handleItemClick = async (qid, marker) => {
   const item = state.items[qid];
   if (item) {
     openItem(item, marker);
-    const labels = await api.fetchLabels([qid]);
-    if (labels[qid]) {
-      setWikidataDetail(qid, labels[qid]);
+    try {
+      const labels = await api.fetchLabels([qid]);
+      if (labels[qid]) {
+        setWikidataDetail(qid, labels[qid]);
+      }
+    } catch (err) {
+      console.error('Error fetching labels:', err);
     }
   }
 };
@@ -262,12 +214,17 @@ const handleOsmClick = async (osmId, marker) => {
     state.selected_marker = marker;
 
     if (osmObj.wikidata_qid) {
-      const labels = await api.fetchLabels([osmObj.wikidata_qid]);
-      if (labels[osmObj.wikidata_qid]) {
-        state.wd_item = {
-          qid: osmObj.wikidata_qid,
-          label: labels[osmObj.wikidata_qid].label,
-        };
+      try {
+        const labels = await api.fetchLabels([osmObj.wikidata_qid]);
+        if (labels[osmObj.wikidata_qid]) {
+          state.wd_item = {
+            qid: osmObj.wikidata_qid,
+            label: labels[osmObj.wikidata_qid].label,
+          };
+        }
+      } catch (err) {
+        console.error('Error fetching labels:', err);
+        state.wd_item = null;
       }
     } else {
       state.wd_item = null;
@@ -278,10 +235,10 @@ const handleOsmClick = async (osmId, marker) => {
 let boundsChangeTimeout = null;
 
 const handleBoundsChange = async (bounds, boundsArray, zoom) => {
-  console.debug('handleBoundsChange called', {zoom, boundsArray, isa_ticked: state.isa_ticked, item_count: state.item_count});
+  console.debug('handleBoundsChange called', {zoom, boundsArray, item_type_ticked: state.item_type_ticked});
   if (boundsChangeTimeout) clearTimeout(boundsChangeTimeout);
   boundsChangeTimeout = setTimeout(async () => {
-    console.debug('handleBoundsChange timeout fired', {isa_ticked: state.isa_ticked});
+    console.debug('handleBoundsChange timeout fired', {item_type_ticked: state.item_type_ticked});
     if (zoom < MIN_ZOOM) {
       setAreaTooBig(true);
       setTooManyItems(false);
@@ -291,20 +248,23 @@ const handleBoundsChange = async (bounds, boundsArray, zoom) => {
     }
     setAreaTooBig(false);
     setLoading(true);
-    try {
-      const isaTypes = state.isa_ticked.length > 0 ? [...state.isa_ticked] : null;
-      console.debug('handleBoundsChange fetching with', {isaTypes, boundsArray});
-      const [itemsResponse, isaResponse] = await Promise.all([
-        api.fetchItems(boundsArray, isaTypes),
-        api.fetchIsaCounts(boundsArray),
-      ]);
+    setError(null);
 
-      const data = itemsResponse.data;
+    try {
+      const itemType = state.item_type_ticked.length > 0 ? state.item_type_ticked[0] : null;
+      console.debug('handleBoundsChange fetching with', {itemType, boundsArray});
+
+      const result = await api.fetchItems(boundsArray, itemType);
+      const data = result.data;
       const items = data.items || {};
       const osmObjects = data.osm_objects || {};
       const warnings = data.warnings || [];
 
-      console.debug('handleBoundsChange items response', {items, osmObjects, warnings});
+      console.debug('handleBoundsChange results', {
+        wikidata: Object.keys(items).length,
+        osm: Object.keys(osmObjects).length,
+        warnings: warnings.length
+      });
 
       if (warnings.length > 0) {
         for (const warning of warnings) {
@@ -317,39 +277,37 @@ const handleBoundsChange = async (bounds, boundsArray, zoom) => {
       }
 
       const qids = Object.keys(items);
-      console.debug('handleBoundsChange qids count', {count: qids.length});
       if (qids.length > 0) {
-        const labels = await api.fetchWikidataDetails(qids);
-        console.debug('handleBoundsChange labels', {labels});
-        for (const qid of qids) {
-          if (labels[qid]) {
-            items[qid].wikidata = items[qid].wikidata || {};
-            items[qid].wikidata.label = labels[qid].label;
+        try {
+          const labels = await api.fetchLabels(qids);
+          console.debug('handleBoundsChange labels', {labels});
+          for (const qid of qids) {
+            if (labels[qid]) {
+              items[qid].wikidata = items[qid].wikidata || {};
+              items[qid].wikidata.label = labels[qid].label;
+            }
           }
+        } catch (err) {
+          console.error('Error fetching labels:', err);
         }
       }
-      console.debug('handleBoundsChange final items', {items, qids: Object.keys(items)});
+
       setItems(items);
       setOsmObjects(osmObjects);
-      setItemTypeHits(isaResponse.data.isa_count || []);
     } catch (err) {
-      console.error('handleBoundsChange error', {err});
-      setError(err.api_call_error_message, err.api_call_error_traceback);
+      console.error('handleBoundsChange error:', err);
+      setError(err.message);
+      setItems({});
+      setOsmObjects({});
     } finally {
       setLoading(false);
     }
   }, 300);
 };
 
-// Search handlers
 const handleSearch = async (query) => {
-  try {
-    const response = await api.search(query);
-    setHits(response.data);
-    state.recent_search = query;
-  } catch (err) {
-    setError(err.api_call_error_message);
-  }
+  setHits([]);
+  state.recent_search = query;
 };
 
 const handleVisitHit = (hit) => {
@@ -357,18 +315,11 @@ const handleVisitHit = (hit) => {
   state.map?.flyTo([hit.lat, hit.lon], 14);
 };
 
-// Item handlers
 const handleOpenItem = (qid) => {
   const item = state.items[qid];
   if (item) {
     openItem(item);
   }
-};
-
-const handleToggleOsm = (osm) => {
-  if (!state.current_item) return;
-  osm.selected = !osm.selected;
-  toggleEdit(state.edits, state.current_item, osm);
 };
 
 const handleZoomMarker = () => {
@@ -377,53 +328,11 @@ const handleZoomMarker = () => {
   }
 };
 
-// Edit handlers
-const handleUpload = async () => {
-  if (!state.edits.length) return;
-
-  setUploadState('init');
-  try {
-    const editList = buildEditList(state.edits);
-    const response = await api.createEditSession(state.changeset_comment, editList);
-    const sessionId = response.data.session_id;
-
-    const es = new EventSource(`${api.api_base_url}/api/1/save/${sessionId}`);
-    es.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      handleUploadEvent(state, data);
-      if (data.event === 'done' || data.type === 'done') {
-        es.close();
-      }
-    };
-    es.onerror = () => {
-      setUploadState('error', {upload_error: 'EventSource error'});
-      es.close();
-    };
-  } catch (err) {
-    setUploadState('error', {upload_error: err.message});
-  }
-};
-
-const closeEditList = () => {
-  state.view_edits = false;
-  clearEdits();
-  resetUpload();
-};
-
-// Filter handlers
-const handleToggleIsa = (qid) => {
-  toggleIsa(qid);
+const handleToggleItemType = (qid) => {
+  toggleItemType(qid);
   state.item_type_search = '';
+  updateUrl();
 };
-
-// Lifecycle
-onMounted(() => {
-  startHealthCheck();
-});
-
-onUnmounted(() => {
-  stopHealthCheck();
-});
 </script>
 
 <style>
