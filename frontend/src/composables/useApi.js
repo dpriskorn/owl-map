@@ -7,10 +7,13 @@ const user_agent = 'owl-map/1.0 (https://github.com/dpriskorn/owl-map)';
 export function useApi() {
   const api_call = async (path, options = {}) => {
     const url = `${api_base_url}/api/1/${path}`;
+    console.debug('api_call starting', {url, path, hasSignal: !!options.signal});
     try {
       const response = await axios({url, ...options});
+      console.debug('api_call completed', {url, status: response.status});
       return response;
     } catch (error) {
+      console.error('api_call failed', {url, err: error.message, status: error.response?.status});
       const api_call_error_message = error.response?.data?.error || error.message;
       const api_call_error_traceback = error.response?.data?.traceback;
       throw {api_call_error_message, api_call_error_traceback};
@@ -20,16 +23,26 @@ export function useApi() {
   let itemsAbort = null;
 
   const fetchItems = async (bbox, isaTypes = null) => {
-    if (itemsAbort) itemsAbort.abort();
+    if (itemsAbort) {
+      console.debug('fetchItems: aborting previous request');
+      itemsAbort.abort();
+    }
     itemsAbort = new AbortController();
     const params = {bbox: bbox.join(',')};
     if (isaTypes && isaTypes.length > 0) {
       params.isa = isaTypes.join(',');
     }
+    console.debug('fetchItems: making request', {params});
     try {
-      return await api_call('items', {params, signal: itemsAbort.signal});
+      const result = await api_call('items', {params, signal: itemsAbort.signal});
+      console.debug('fetchItems: got result', {itemCount: Object.keys(result.data.items || {}).length});
+      return result;
     } catch (err) {
-      if (axios.isCancel(err) || err.name === 'CanceledError') return {data: {items: {}}};
+      if (axios.isCancel(err) || err.name === 'CanceledError') {
+        console.debug('fetchItems: request was cancelled');
+        return {data: {items: {}}};
+      }
+      console.error('fetchItems: request failed', {err});
       throw err;
     }
   };

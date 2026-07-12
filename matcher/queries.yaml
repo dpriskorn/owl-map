@@ -34,3 +34,11 @@ get_item_coordinates: |
   SELECT ?coord WHERE {
     wd:{qid} wdt:P625 ?coord .
   }}
+
+get_item_p1282: |
+  PREFIX wdt: <http://www.wikidata.org/prop/direct/>
+  PREFIX wd: <http://www.wikidata.org/entity/>
+  PREFIX bd: <http://www.bigdata.com/rdf#>
+  SELECT ?osm_tag WHERE {
+    wd:{qid} wdt:P1282 ?osm_tag .
+  }}

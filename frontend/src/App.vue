@@ -27,11 +27,17 @@
       <MapView
         class="flex-grow-1"
         :items="state.items"
+        :osm-objects="state.osm_objects"
         :current-item="state.current_item"
         :selected-items="state.selected_items"
         :current-osm="state.current_osm"
+        :initial-lat="mapPosition.lat"
+        :initial-lon="mapPosition.lon"
+        :initial-zoom="mapPosition.zoom"
         @item-click="handleItemClick"
+        @osm-click="handleOsmClick"
         @bounds-change="handleBoundsChange"
+        @position-change="handlePositionChange"
       />
 
       <AppSidebar class="w-25 min-width-300">
@@ -103,6 +109,12 @@
       :traceback="state.api_call_error_traceback"
     />
 
+    <P1282WarningModal
+      v-if="state.p1282_warning"
+      :warning="state.p1282_warning"
+      @dismiss="clearP1282Warning"
+    />
+
     <ImageModal
       v-if="state.current_item"
       :item="state.current_item"
@@ -113,6 +125,7 @@
 
 <script setup>
 import {ref, watch, onMounted, onUnmounted} from 'vue';
+import {useRoute} from 'vue-router';
 import MapView from './components/MapView.vue';
 import AppSidebar from './components/AppSidebar.vue';
 import SearchPanel from './components/SearchPanel.vue';
@@ -122,12 +135,15 @@ import ItemTypeFilter from './components/ItemTypeFilter.vue';
 import EditPanel from './components/EditPanel.vue';
 import ErrorModal from './components/ErrorModal.vue';
 import ImageModal from './components/ImageModal.vue';
+import P1282WarningModal from './components/P1282WarningModal.vue';
 
 import {useState} from './composables/useState.js';
 import {useApi} from './composables/useApi.js';
 import {useEdits} from './composables/useEdits.js';
 
 const MIN_ZOOM = parseInt(import.meta.env.VITE_MIN_ZOOM || '13', 10);
+
+const route = useRoute();
 
 const {
   state,
@@ -137,6 +153,7 @@ const {
   closeItem,
   clearEdits,
   setItems,
+  setOsmObjects,
   setLoading,
   setAreaTooBig,
   setTooManyItems,
@@ -150,6 +167,8 @@ const {
   setWikidataSearchResults,
   toggleIsa,
   clearIsaFilters,
+  setP1282Warning,
+  clearP1282Warning,
 } = useState();
 
 const api = useApi();
@@ -157,6 +176,28 @@ const {toggleEdit, buildEditList, handleUploadEvent} = useEdits();
 
 const backendUp = ref(true);
 let healthCheckInterval = null;
+
+const mapPosition = ref({
+  lat: parseFloat(route.params.lat) || parseFloat(import.meta.env.VITE_DEFAULT_LAT || '62.3913'),
+  lon: parseFloat(route.params.lon) || parseFloat(import.meta.env.VITE_DEFAULT_LON || '17.3068'),
+  zoom: parseInt(route.params.zoom) || parseInt(import.meta.env.VITE_DEFAULT_ZOOM || '8'),
+});
+
+const updateUrl = () => {
+  const {lat, lon, zoom} = mapPosition.value;
+  const newPath = `/map/${zoom}/${lat.toFixed(6)}/${lon.toFixed(6)}`;
+  if (window.location.pathname !== newPath) {
+    window.history.replaceState(null, '', newPath);
+  }
+};
+
+const handlePositionChange = ({lat, lon, zoom}) => {
+  mapPosition.value = {lat, lon, zoom};
+  updateUrl();
+};
+
+// Debounce helper
+let searchTimeout = null;
 
 const checkBackendHealth = async () => {
   backendUp.value = await api.healthCheck();
@@ -174,8 +215,6 @@ const stopHealthCheck = () => {
   }
 };
 
-// Debounce helper
-let searchTimeout = null;
 const debounceSearch = async (query) => {
   if (searchTimeout) clearTimeout(searchTimeout);
   searchTimeout = setTimeout(async () => {
@@ -215,29 +254,70 @@ const handleItemClick = async (qid, marker) => {
   }
 };
 
+const handleOsmClick = async (osmId, marker) => {
+  const osmObj = state.osm_objects[osmId];
+  if (osmObj) {
+    state.current_osm = osmObj;
+    state.current_item = null;
+    state.selected_marker = marker;
+
+    if (osmObj.wikidata_qid) {
+      const labels = await api.fetchLabels([osmObj.wikidata_qid]);
+      if (labels[osmObj.wikidata_qid]) {
+        state.wd_item = {
+          qid: osmObj.wikidata_qid,
+          label: labels[osmObj.wikidata_qid].label,
+        };
+      }
+    } else {
+      state.wd_item = null;
+    }
+  }
+};
+
 let boundsChangeTimeout = null;
 
 const handleBoundsChange = async (bounds, boundsArray, zoom) => {
+  console.debug('handleBoundsChange called', {zoom, boundsArray, isa_ticked: state.isa_ticked, item_count: state.item_count});
   if (boundsChangeTimeout) clearTimeout(boundsChangeTimeout);
   boundsChangeTimeout = setTimeout(async () => {
+    console.debug('handleBoundsChange timeout fired', {isa_ticked: state.isa_ticked});
     if (zoom < MIN_ZOOM) {
       setAreaTooBig(true);
       setTooManyItems(false);
       setItems({});
+      setOsmObjects({});
       return;
     }
     setAreaTooBig(false);
     setLoading(true);
     try {
-      const isaTypes = state.isa_ticked.length > 0 ? state.isa_ticked : null;
+      const isaTypes = state.isa_ticked.length > 0 ? [...state.isa_ticked] : null;
+      console.debug('handleBoundsChange fetching with', {isaTypes, boundsArray});
       const [itemsResponse, isaResponse] = await Promise.all([
         api.fetchItems(boundsArray, isaTypes),
         api.fetchIsaCounts(boundsArray),
       ]);
-      const items = itemsResponse.data.items;
-      console.debug('handleBoundsChange items response', {items});
+
+      const data = itemsResponse.data;
+      const items = data.items || {};
+      const osmObjects = data.osm_objects || {};
+      const warnings = data.warnings || [];
+
+      console.debug('handleBoundsChange items response', {items, osmObjects, warnings});
+
+      if (warnings.length > 0) {
+        for (const warning of warnings) {
+          if (warning.type === 'no_p1282') {
+            setP1282Warning(warning);
+          }
+        }
+      } else {
+        clearP1282Warning();
+      }
+
       const qids = Object.keys(items);
-      console.debug('handleBoundsChange qids', {qids});
+      console.debug('handleBoundsChange qids count', {count: qids.length});
       if (qids.length > 0) {
         const labels = await api.fetchWikidataDetails(qids);
         console.debug('handleBoundsChange labels', {labels});
@@ -248,10 +328,12 @@ const handleBoundsChange = async (bounds, boundsArray, zoom) => {
           }
         }
       }
-      console.debug('handleBoundsChange final items', {items});
+      console.debug('handleBoundsChange final items', {items, qids: Object.keys(items)});
       setItems(items);
+      setOsmObjects(osmObjects);
       setItemTypeHits(isaResponse.data.isa_count || []);
     } catch (err) {
+      console.error('handleBoundsChange error', {err});
       setError(err.api_call_error_message, err.api_call_error_traceback);
     } finally {
       setLoading(false);

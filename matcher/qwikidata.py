@@ -97,7 +97,9 @@ def wikidata_items(bounds: list[float], isa_types: list[str] | None = None) -> d
     """
     lat_min, lon_min, lat_max, lon_max = bounds
     query = _build_items_query(bounds, isa_types)
+    print(f"wikidata_items: query=\n{query}")
     result = qlever.execute_query(query)
+    print(f"wikidata_items: got {len(result.get('results', {}).get('bindings', []))} bindings")
     items: dict[str, dict] = {}
     try:
         for binding in result["results"]["bindings"]:
@@ -130,6 +132,59 @@ def wikidata_isa_counts(bounds: list[float]) -> list[dict]:
     return isa_count
 
 
+def wikidata_items_by_qids(qids: list[str], isa_type: str | None = None) -> dict:
+    """Get Wikidata items by QIDs with optional ISA type filtering.
+
+    Uses Qlever's VALUES clause for efficient bulk QID lookup,
+    then filters by ISA type if specified.
+
+    Args:
+        qids: List of QIDs to fetch (e.g., ['Q123', 'Q456'])
+        isa_type: Optional single ISA type QID to filter by (e.g., 'Q567998')
+
+    Returns:
+        Items dict keyed by QID, each with markers array and optional wikidata metadata.
+    """
+    if not qids:
+        return {"items": {}, "isa_count": []}
+
+    values_clause = " ".join(f"wd:{qid}" for qid in qids)
+
+    isa_filter = ""
+    if isa_type:
+        isa_filter = f"?item wdt:P31 wd:{isa_type} ."
+
+    query = f"""PREFIX wdt: <http://www.wikidata.org/prop/direct/>
+PREFIX wd: <http://www.wikidata.org/entity/>
+PREFIX bd: <http://www.bigdata.com/rdf#>
+SELECT ?item (STR(?coord) AS ?coord_str) WHERE {{
+  VALUES ?item {{ {values_clause} }}
+  ?item wdt:P625 ?coord .
+  {isa_filter}
+}}
+LIMIT {len(qids) * 2}"""
+
+    print(f"wikidata_items_by_qids: query=\n{query}")
+    result = qlever.execute_query(query)
+    print(f"wikidata_items_by_qids: got {len(result.get('results', {}).get('bindings', []))} bindings")
+
+    items: dict[str, dict] = {}
+    try:
+        for binding in result["results"]["bindings"]:
+            qid = binding["item"]["value"].split("/")[-1]
+            coord_str = binding["coord_str"]["value"]
+            coords = _parse_point(coord_str)
+            if coords:
+                lat, lon = coords
+                if qid not in items:
+                    items[qid] = {"qid": qid, "markers": []}
+                items[qid]["markers"].append({"lat": lat, "lon": lon})
+    except (KeyError, ValueError):
+        pass
+
+    return {"items": items, "isa_count": []}
+
+
 def get_item_coordinates(qid: str) -> tuple[float, float] | None:
     """Get coordinates for a single Wikidata item via Qlever."""
     query = QUERIES["get_item_coordinates"].format(qid=qid)
@@ -138,4 +193,21 @@ def get_item_coordinates(qid: str) -> tuple[float, float] | None:
         coord_str = result["results"]["bindings"][0]["coord"]["value"]
         return _parse_point(coord_str)
     except (KeyError, IndexError, ValueError):
+        return None
+
+
+def get_item_p1282(qid: str) -> str | None:
+    """Get P1282 (OSM tag) value for a Wikidata item.
+
+    Args:
+        qid: Wikidata QID (e.g., 'Q567998')
+
+    Returns:
+        The P1282 OSM tag value (e.g., 'leisure=bathing_place') or None if not found
+    """
+    query = QUERIES["get_item_p1282"].format(qid=qid)
+    result = qlever.execute_query(query)
+    try:
+        return result["results"]["bindings"][0]["osm_tag"]["value"]
+    except (KeyError, IndexError):
         return None

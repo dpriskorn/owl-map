@@ -1,63 +1,58 @@
 <template>
-  <div class="p-3">
-    <h6>Item type filters</h6>
+  <div class="d-flex flex-column h-100">
+    <div class="p-3 flex-grow-1">
+      <h6>Item type filter</h6>
 
-    <div v-if="isaTicked.length" class="mb-2 d-flex flex-wrap gap-1">
-      <span
-        v-for="item in selectedItems"
-        :key="item.qid"
-        class="badge bg-primary d-flex align-items-center gap-1"
+      <div v-if="isaTicked.length" class="mb-2">
+        <div class="input-group">
+          <span class="form-control bg-primary text-white d-flex align-items-center gap-2">
+            {{ selectedItems[0]?.label || selectedItems[0]?.qid }}
+            <button
+              type="button"
+              class="btn-close btn-close-white ms-auto"
+              @click.prevent="$emit('toggle-isa', selectedItems[0].qid)"
+            ></button>
+          </span>
+        </div>
+        <small class="text-muted">Press X to search for another type</small>
+      </div>
+
+      <input
+        v-else
+        v-model="searchQuery"
+        type="text"
+        class="form-control mb-2"
+        placeholder="Search type..."
       >
-        {{ item.label || item.qid }}
-        <button
-          type="button"
-          class="btn-close btn-close-white"
-          style="font-size: 0.5rem;"
-          @click.prevent="$emit('toggle-isa', item.qid)"
-        ></button>
-      </span>
+
+      <div v-if="!isaTicked.length && displayHits.length" class="list-group">
+        <a
+          v-for="hit in displayHits"
+          :key="hit.qid || hit.id"
+          class="list-group-item d-flex flex-column"
+          href="#"
+          @click.prevent="$emit('toggle-isa', hit.qid || hit.id)"
+        >
+          <span :class="isTicked(hit.qid || hit.id) ? 'fw-bold' : ''">
+            {{ hit.label || hit.qid || hit.id }}
+          </span>
+          <small v-if="hit.description" class="text-muted">{{ hit.description }}</small>
+        </a>
+      </div>
+
+      <div v-else-if="!isaTicked.length && searchQuery && searchQuery.length >= 3" class="text-muted small">
+        No results found
+      </div>
     </div>
 
-    <input
-      v-model="searchQuery"
-      type="text"
-      class="form-control mb-2"
-      placeholder="Search type..."
-    >
-
-    <div v-if="displayHits.length" class="list-group">
-      <a
-        v-for="hit in displayHits"
-        :key="hit.qid || hit.id"
-        class="list-group-item d-flex flex-column"
-        href="#"
-        @click.prevent="$emit('toggle-isa', hit.qid || hit.id)"
+    <div class="p-3 border-top">
+      <button
+        class="btn btn-sm btn-outline-danger w-100"
+        @click="$emit('clear-cache')"
       >
-        <span :class="isTicked(hit.qid || hit.id) ? 'fw-bold' : ''">
-          {{ hit.label || hit.qid || hit.id }}
-        </span>
-        <small v-if="hit.description" class="text-muted">{{ hit.description }}</small>
-      </a>
+        Clear cache
+      </button>
     </div>
-
-    <div v-else-if="searchQuery && searchQuery.length >= 3" class="text-muted small">
-      No results found
-    </div>
-
-    <button
-      v-if="isaTicked.length"
-      class="btn btn-sm btn-outline-secondary mt-2"
-      @click="$emit('clear-all')"
-    >
-      Clear all
-    </button>
-
-    <button
-      class="btn btn-sm btn-outline-danger mt-2"
-      @click="$emit('clear-cache')"
-    >
-      Clear cache
-    </button>
   </div>
 </template>
 

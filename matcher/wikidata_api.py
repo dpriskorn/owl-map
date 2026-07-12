@@ -106,3 +106,44 @@ def get_entities(ids: list[str]) -> typing.Iterator[tuple[str, EntityType]]:
     """Get Wikidata item entities with the given QIDs."""
     r = api_get({"action": "wbgetentities", "ids": "|".join(ids)})
     return ((qid, entity) for qid, entity in r.json()["entities"].items())
+
+
+def get_items_near_coordinates(lat: float, lon: float, radius_km: float = 10) -> list[str]:
+    """Get Wikidata item QIDs near coordinates using Wikimedia API.
+
+    Uses the nearcoord generator to find items within radius of a point.
+    Returns list of QIDs (e.g., ['Q123', 'Q456']).
+
+    Args:
+        lat: Latitude of center point
+        lon: Longitude of center point
+        radius_km: Search radius in kilometers (default 10)
+
+    Returns:
+        List of QIDs found near the coordinates
+    """
+    radius_m = int(radius_km * 1000)
+    params: CallParams = {
+        "action": "query",
+        "format": "json",
+        "formatversion": 2,
+        "prop": "coordinates",
+        "colimit": "max",
+        "generator": "search",
+        "gsrsearch": f"nearcoord:{radius_m}m,{lat},{lon}",
+        "gsrnamespace": 0,
+        "gsrlimit": 300,
+    }
+    r = api_get(params)
+    try:
+        data = r.json()
+    except simplejson.errors.JSONDecodeError:
+        print(f"Error decoding nearcoord response: {r.text}")
+        return []
+
+    qids = []
+    if "query" in data and "pages" in data["query"]:
+        for page in data["query"]["pages"].values():
+            if "title" in page and page["title"].startswith("Q"):
+                qids.append(page["title"])
+    return qids

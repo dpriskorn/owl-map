@@ -19,10 +19,14 @@ class QleverIntegrator:
 
     def execute_query(self, query: str) -> dict:
         """Execute a SPARQL query and return JSON results."""
+        print(f"qlever executing query:\n{query[:500]}...")
         params = {"query": query, "action": "json_export"}
         response = self.session.get(self.endpoint, params=params, timeout=60)
+        print(f"qlever response status: {response.status_code}")
         response.raise_for_status()
-        return response.json()
+        result = response.json()
+        print(f"qlever got {len(result.get('results', {}).get('bindings', []))} bindings")
+        return result
 
 
 qlever = QleverIntegrator()

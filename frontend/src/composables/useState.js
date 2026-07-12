@@ -44,8 +44,14 @@ export function useState() {
     item_type_hits: [],
     wikidata_search_results: [],
 
+    // OSM objects
+    osm_objects: {},
+
     // Item detail
     wd_item: null,
+
+    // Warnings
+    p1282_warning: null,
 
     // Auth
     username: null,
@@ -60,10 +66,12 @@ export function useState() {
   const itemsList = computed(() => Object.values(state.items));
 
   const visibleItems = computed(() => {
-    return itemsList.value.filter(item => {
+    const result = itemsList.value.filter(item => {
       if (!item.markers || !item.markers.length) return false;
       return true;
     });
+    console.debug('visibleItems computed', {filteredCount: result.length, allCount: itemsList.value.length});
+    return result;
   });
 
   const itemCount = computed(() => Object.keys(state.items).length);
@@ -92,8 +100,22 @@ export function useState() {
 
   // Item actions
   const setItems = (itemsObj) => {
+    console.debug('setItems called', {count: Object.keys(itemsObj).length, qids: Object.keys(itemsObj)});
     state.items = {...itemsObj};
-    state.item_count = Object.keys(itemsObj).length;
+    console.debug('setItems done', {itemCount: Object.keys(state.items).length});
+  };
+
+  const setOsmObjects = (osmObj) => {
+    console.debug('setOsmObjects called', {count: Object.keys(osmObj).length});
+    state.osm_objects = {...osmObj};
+  };
+
+  const setP1282Warning = (warning) => {
+    state.p1282_warning = warning;
+  };
+
+  const clearP1282Warning = () => {
+    state.p1282_warning = null;
   };
 
   const addItem = (qid, item) => {
@@ -158,11 +180,10 @@ export function useState() {
 
   // Filter actions
   const toggleIsa = (qid) => {
-    const idx = state.isa_ticked.indexOf(qid);
-    if (idx !== -1) {
-      state.isa_ticked.splice(idx, 1);
+    if (state.isa_ticked.includes(qid)) {
+      state.isa_ticked = [];
     } else {
-      state.isa_ticked.push(qid);
+      state.isa_ticked = [qid];
     }
   };
 
@@ -253,5 +274,9 @@ export function useState() {
     clearError,
     setUploadState,
     resetUpload,
+    // OSM
+    setOsmObjects,
+    setP1282Warning,
+    clearP1282Warning,
   };
 }
