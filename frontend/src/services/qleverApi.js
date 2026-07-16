@@ -2,7 +2,7 @@ import axios from 'redaxios';
 
 const QLEVER_WIKIDATA_URL = 'https://qlever.cs.uni-freiburg.de/api/wikidata';
 const QLEVER_OSM_URL = 'https://qlever.dev/osm-planet';
-const USER_AGENT = 'owl-map/1.0 (https://github.com/dpriskorn/owl-map)';
+const USER_AGENT = 'owl-map/1.0 (https://github.com/dpriskorn/owl-map; User:So9q)';
 
 const qleverWikidata = axios.create({
   baseURL: QLEVER_WIKIDATA_URL,

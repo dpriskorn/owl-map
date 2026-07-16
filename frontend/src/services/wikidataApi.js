@@ -2,7 +2,7 @@ import axios from 'redaxios';
 
 const WIKIDATA_API_URL = 'https://www.wikidata.org/w/api.php';
 const WIKIDATA_REST_URL = 'https://www.wikidata.org/w/rest.php/wikibase/v1';
-const USER_AGENT = 'owl-map/1.0 (https://github.com/dpriskorn/owl-map)';
+const USER_AGENT = 'owl-map/1.0 (https://github.com/dpriskorn/owl-map; User:So9q)';
 
 const wikidataApi = axios.create({
   baseURL: WIKIDATA_API_URL,
